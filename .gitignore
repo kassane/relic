@@ -29,3 +29,6 @@ include/relic_conf.h
 install_manifest.txt
 
 src/low/fiat/*.c
+
+zig-out/
+zig-cache/
