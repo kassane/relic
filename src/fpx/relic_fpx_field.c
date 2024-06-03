@@ -38,9 +38,11 @@
 
 int fp2_field_get_qnr() {
 	/* Override some of the results when cubic non-residue is also needed. */
-#if FP_PRIME == 158 || FP_PRIME == 256
+#if FP_PRIME == 1150
+	return 32;
+#elif FP_PRIME == 158 || FP_PRIME == 256
 	return 4;
-#elif FP_PRIME == 446
+#elif FP_PRIME == 446 && !defined(FP_QNRES)
 	return 16;
 #else
 	return core_get()->qnr2;
@@ -54,8 +56,9 @@ int fp3_field_get_cnr() {
 	} else {
 		return 3;
 	}
+#elif FP_PRIME == 768
+	return -4;
 #endif
-
 	return core_get()->cnr3;
 }
 
@@ -81,10 +84,10 @@ void fp2_field_init(void) {
 		ctx->qnr2 = 0;
 		fp_zero(t0[0]);
 		fp_set_dig(t0[1], 1);
-		/* If it does not work, attempt (u + 2), otherwise double. */
-		/* We cannot used QR test here because Frobenius constants below. */
+		/* If it does not work, attempt (u + 1), otherwise double. */
+		/* We cannot used QR test here due to Frobenius constants below. */
 		if (fp2_srt(t1, t0)) {
-			ctx->qnr2 = 2;
+			ctx->qnr2 = 1;
 			fp_set_dig(t0[0], ctx->qnr2);
 			while (fp2_srt(t1, t0) && util_bits_dig(ctx->qnr2) < RLC_DIG - 1) {
 				/* Pick a power of 2 for efficiency. */
@@ -188,7 +191,7 @@ void fp3_field_init(void) {
 		fp_zero(t0[2]);
 		/* If it does not work, attempt (u + 1), otherwise double. */
 		/* This code will fail if p \neq 1 mod 8 because square root in Fp^3
-		 * relic on Frobenius. Must implement explicit test for those cases. */
+		 * relies on Frobenius. Must implement explicit test for those cases. */
 		if (fp3_srt(t1, t0)) {
 			ctx->cnr3 = 1;
 			fp_set_dig(t0[0], ctx->cnr3);

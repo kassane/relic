@@ -196,9 +196,10 @@ static void pp_mil_lit_k18(fp18_t r, ep_t *t, ep_t *p, ep3_t *q, int m, bn_t a) 
  * @param[out] t			- the resulting point.
  * @param[in] q				- the first point of the pairing, in G_2.
  * @param[in] p				- the second point of the pairing, in G_1.
- * @param[in] a				- the loop parameter.
+ * @param[in] f				- the flag to correct for the curve family.
  */
-static void pp_fin_k18_oatep(fp18_t r, ep3_t t, ep3_t q, ep_t p, int f) {
+static void pp_fin_k18_oatep(fp18_t r, ep3_t t, const ep3_t q, const ep_t p,
+		int f) {
     fp18_t u, v;
     ep3_t _q;
     ep_t _p;
@@ -549,6 +550,16 @@ void pp_map_oatep_k18(fp18_t r, const ep_t p, const ep3_t q) {
 					pp_fin_k18_oatep(r, t[0], _q[0], _p[0], 1);
 					pp_exp_k18(r, r);
 					break;
+				case EP_FM18:
+					/* r = f_{|a|,Q}(P). */
+					pp_mil_k18(r, t, _q, _p, 1, a);
+					if (bn_sign(a) == RLC_NEG) {
+						/* f_{-a,Q}(P) = 1/f_{a,Q}(P). */
+						fp18_inv_cyc(r, r);
+						ep3_neg(t[0], t[0]);
+					}
+					pp_exp_k18(r, r);
+					break;
 			}
 		}
 	}
@@ -625,6 +636,15 @@ void pp_map_sim_oatep_k18(fp18_t r, const ep_t *p, const ep3_t *q, int m) {
 						}
 						/* Apply Frobenius only once. */
 						pp_fin_k18_oatep(r, t[i], _q[i], _p[i], i == 0);
+					}
+					pp_exp_k18(r, r);
+					break;
+				case EP_FM18:
+					/* r = f_{|a|,Q}(P). */
+					pp_mil_k18(r, t, _q, _p, j, a);
+					if (bn_sign(a) == RLC_NEG) {
+						/* f_{-a,Q}(P) = 1/f_{a,Q}(P). */
+						fp18_inv_cyc(r, r);
 					}
 					pp_exp_k18(r, r);
 					break;

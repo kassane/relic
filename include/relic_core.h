@@ -36,6 +36,10 @@
 #ifndef RLC_CORE_H
 #define RLC_CORE_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -228,7 +232,7 @@ typedef struct _ctx_t {
 	/** Value of constant one in Montgomery form. */
 	bn_st one;
 #endif /* FP_RDC == MONTY */
-#if FP_INV == JUMPDS || !defined(STRIP)
+#if FP_INV == JMPDS || !defined(STRIP)
 	/** Value of constant for divstep-based inversion. */
 	bn_st inv;
 #endif /* FP_INV */
@@ -263,8 +267,6 @@ typedef struct _ctx_t {
 	fp_st ep_a;
 	/** The b-coefficient of the elliptic curve. */
 	fp_st ep_b;
-	/** The value 3b used in elliptic curve arithmetic. */
-	fp_st ep_b3;
 	/** The generator of the elliptic curve. */
 	ep_st ep_g;
 	/** The order of the group of points in the elliptic curve. */
@@ -276,9 +278,9 @@ typedef struct _ctx_t {
 	/** Precomputed constants for hashing. */
 	fp_st ep_map_c[7];
 #ifdef EP_ENDOM
+	fp_st beta;
 #if EP_MUL == LWNAF || EP_FIX == COMBS || EP_FIX == LWNAF || EP_SIM == INTER || !defined(STRIP)
 	/** Parameters required by the GLV method. @{ */
-	fp_st beta;
 	bn_st ep_v1[3];
 	bn_st ep_v2[3];
 	/** @} */
@@ -288,8 +290,6 @@ typedef struct _ctx_t {
 	int ep_opt_a;
 	/** Optimization identifier for the b-coefficient. */
 	int ep_opt_b;
-	/** Optimization identifier for the b3 value. */
-	int ep_opt_b3;
 	/** Flag that stores if the prime curve has efficient endomorphisms. */
 	int ep_is_endom;
 	/** Flag that stores if the prime curve is supersingular. */
@@ -546,6 +546,10 @@ void core_set(ctx_t *ctx);
  * @param[in] init_ptr a pointer which is passed to the initialized
  */
 void core_set_thread_initializer(void (*init)(void *init_ptr), void *init_ptr);
+#endif
+
+#ifdef __cplusplus
+}
 #endif
 
 #endif /* !RLC_CORE_H */

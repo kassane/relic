@@ -83,7 +83,7 @@ static void fp_prime_set(const bn_t p) {
 
 #endif /* FP_RDC == MONTY */
 
-#if FP_INV == JUMPDS || !defined(STRIP)
+#if FP_INV == JMPDS || !defined(STRIP)
 
 		int d = (45907 * FP_PRIME + 26313) / 19929;
 
@@ -101,16 +101,19 @@ static void fp_prime_set(const bn_t p) {
 		fp_exp(ctx->inv.dp, ctx->inv.dp, t);
 
 #if FP_RDC == MONTY
-
+		/* Convert to Montgomery form by multiplying by R^2. */
+		fp_mul(ctx->inv.dp, ctx->inv.dp, ctx->conv.dp);
+		fp_mul(ctx->inv.dp, ctx->inv.dp, ctx->conv.dp);
 #ifdef RLC_FP_ROOM
-		fp_mul(ctx->inv.dp, ctx->inv.dp, ctx->conv.dp);
-		fp_mul(ctx->inv.dp, ctx->inv.dp, ctx->conv.dp);
-
 		for (int i = 1, j = 0; i < d / (RLC_DIG - 2); i++) {
 			j = i % RLC_FP_DIGS;
 			if (j == 0) {
 				fp_mulm_low(ctx->inv.dp, ctx->inv.dp, ctx->conv.dp);
 			}
+		}
+#else
+		for (int i = 0; i < d / (RLC_DIG - 2) - 1; i++) {
+			fp_mulm_low(ctx->inv.dp, ctx->inv.dp, ctx->conv.dp);
 		}
 #endif
 
@@ -243,7 +246,7 @@ void fp_prime_init(void) {
 	bn_make(&(ctx->conv), RLC_FP_DIGS);
 	bn_make(&(ctx->one), RLC_FP_DIGS);
 #endif
-#if FP_INV == JUMPDS || !defined(STRIP)
+#if FP_INV == JMPDS || !defined(STRIP)
 	bn_make(&(ctx->inv), RLC_FP_DIGS);
 #endif /* FP_INV */
 	bn_make(&(ctx->srt), RLC_FP_DIGS);
@@ -262,7 +265,7 @@ void fp_prime_clean(void) {
 		bn_clean(&(ctx->one));
 		bn_clean(&(ctx->conv));
 #endif
-#if FP_INV == JUMPDS || !defined(STRIP)
+#if FP_INV == JMPDS || !defined(STRIP)
 		bn_clean(&(ctx->inv));
 #endif /* FP_INV */
 		bn_clean(&(ctx->srt));
@@ -437,6 +440,25 @@ void fp_prime_set_pairf(const bn_t x, int pairf) {
 				bn_div_dig(p, p, 4);
 				fp_prime_set_dense(p);
 				break;
+			case EP_FM16:
+				/* p = (x^16 + x^10 + 5*x^8 + x^2 + 4*x + 4)/4 */
+				bn_sqr(t1, t0);
+				bn_mul(p, t1, t0);
+				bn_sqr(p, p);
+				bn_add_dig(p, p, 1);
+				bn_mul(p, p, t1);
+				bn_add_dig(p, p, 5);
+				bn_mul(p, p, t1);
+				bn_mul(p, p, t1);
+				bn_mul(p, p, t1);
+				bn_add_dig(p, p, 1);
+				bn_mul(p, p, t0);
+				bn_add_dig(p, p, 4);
+				bn_mul(p, p, t0);
+				bn_add_dig(p, p, 4);
+				bn_div_dig(p, p, 4);
+				fp_prime_set_dense(p);
+				break;
 			case EP_K16:
 				/* p = (u^10 + 2*u^9 + 5*u^8 + 48*u^6 + 152*u^5 + 240*u^4 +
 						625*u^2 + 2398*u + 3125) div 980 */
@@ -500,6 +522,34 @@ void fp_prime_set_pairf(const bn_t x, int pairf) {
  				bn_div_dig(p, p, 21);
  				fp_prime_set_dense(p);
  				break;
+			case EP_FM18:
+				/* p = (3x^{12} - 3x^9 + x^8 - 2x^7 + 7x^6 - x^5 - x^4 - 4x^3 +
+						+ x^2 - 2x + 4)/3 */
+				bn_sqr(p, t0);
+				bn_mul(p, p, t0);
+				bn_mul_dig(p, p, 3);
+				bn_sub_dig(p, p, 3);
+				bn_mul(p, p, t0);
+				bn_add_dig(p, p, 1);
+				bn_mul(p, p, t0);
+				bn_sub_dig(p, p, 2);
+				bn_mul(p, p, t0);
+				bn_add_dig(p, p, 7);
+				bn_mul(p, p, t0);
+				bn_sub_dig(p, p, 1);
+				bn_mul(p, p, t0);
+				bn_sub_dig(p, p, 1);
+				bn_mul(p, p, t0);
+				bn_sub_dig(p, p, 4);
+				bn_mul(p, p, t0);
+				bn_add_dig(p, p, 1);
+				bn_mul(p, p, t0);
+				bn_sub_dig(p, p, 2);
+				bn_mul(p, p, t0);
+				bn_add_dig(p, p, 4);
+ 				bn_div_dig(p, p, 3);
+				fp_prime_set_dense(p);
+				break;
  			case EP_SG18:
  				/* p = 243x^10 - 162x^8 + 81*x^7 + 27x^6 - 54x^5 + 9x^4 + 9x^3 -
  				       3x^2 + 1 */

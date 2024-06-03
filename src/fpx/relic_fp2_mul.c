@@ -73,8 +73,6 @@ void fp2_mul_basic(fp2_t c, const fp2_t a, const fp2_t b) {
 
 		/* t1 = (a_0 * b_0) + i^2 * (a_1 * b_1). */
 		fp_subc_low(t1, t0, t4);
-
-		/* t1 = u^2 * (a_1 * b_1). */
 		for (int i = -1; i > fp_prime_get_qnr(); i--) {
 			fp_subc_low(t1, t1, t4);
 		}
@@ -123,17 +121,20 @@ void fp2_mul_nor_basic(fp2_t c, const fp2_t a) {
 		int qnr = fp2_field_get_qnr();
 
 		switch (fp_prime_get_mod8()) {
-			case 3:
-				/* If p = 3 mod 8, (1 + i) is a QNR/CNR. */
-				fp_neg(t[0], a[1]);
-				fp_add(c[1], a[0], a[1]);
-				fp_add(c[0], t[0], a[0]);
-				break;
 			case 1:
 			case 5:
 				/* If p = 1,5 mod 8, (i) is a QNR/CNR. */
 				fp2_mul_art(c, a);
 				break;
+			case 3:
+				if (qnr == 1) {
+					/* If p = 3 mod 8, (1 + i) is a QNR/CNR. */
+					fp_neg(t[0], a[1]);
+					fp_add(c[1], a[0], a[1]);
+					fp_add(c[0], t[0], a[0]);
+					break;
+				}
+				/* Otherwise, fall back to next one. */
 			case 7:
 				/* If p = 7 mod 8, we choose (2^k + i) as a QNR/CNR. */
 				fp2_mul_art(t, a);

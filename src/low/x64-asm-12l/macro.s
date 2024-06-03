@@ -30,9 +30,22 @@
  *
  * @ingroup fp
  */
-
-#if FP_PRIME == 766
-/* KSS16-P766 */
+#if FP_PRIME == 768
+#define P0	0x591ADE1200800001
+#define P1	0xACE2A12843C534B1
+#define P2	0x9FBEDDEE98705380
+#define P3	0x1429BCDA53E20A8F
+#define P4	0x31B6221831F61A72
+#define P5	0x828EC90E320E3793
+#define P6	0x9AD532EA851862BD
+#define P7	0x6A6D9D80470079AE
+#define P8	0xBA1AF14A9BC88DBA
+#define P9	0x172EC88A91CFC7D2
+#define P10 0x3290395E476657BA
+#define P11 0xFFFFFFE4FF400142
+#define U0	0x471A9E12007FFFFF
+#elif FP_PRIME == 766
+/* KSS16-P766
 #define P0	0xB955C8905EF99F8D
 #define P1	0x7D1C278139EFCE97
 #define P2	0xB72041F5E8174021
@@ -46,20 +59,36 @@
 #define P10 0xD1F39E5F37AEACB3
 #define P11 0x3C410B7E6EC19106
 #define U0	0xC18CA908C52344BB
+*/
+/* AFG16-766 */
+#define P0	0xF45D1E791E054605
+#define P1	0xFCBC4220020A6592
+#define P2	0x211730168CD3106C
+#define P3	0xC81A3A94170A2E5A
+#define P4	0x04A837318C7897B6
+#define P5	0xA2902CAC0A117EAD
+#define P6	0x4C8C62B406D882C8
+#define P7	0xDC0F8D8300A6748A
+#define P8	0x67D35D389C7BD43C
+#define P9	0x89F38FC6E7249EF1
+#define P10 0xC2E122127943E41E
+#define P11 0x3FFFB8002607F379
+#define U0	0xF282381A203F6933
 #elif FP_PRIME == 765
-#define P0	0x0000000000000001
-#define P1	0x00000000384F0100
-#define P2	0x7D00000000000000
-#define P3	0xFFFEE92F0199280F
-#define P4	0xF10B013FFFFFFFFF
-#define P5	0x4AC04FAC4912BADA
-#define P6	0x6AC50E5A1A6AEAE4
-#define P7	0xEE9C1E7F21BD9E92
-#define P8	0x249F514A2A836FBF
-#define P9	0x8866F5670199231B
-#define P10 0xB2847B1232833CC3
-#define P11 0x16FAB993B0C96754
-#define U0	0xFFFFFFFFFFFFFFFF
+/* FM16-765 */
+#define P0	0x1000EFC080000001
+#define P1	0x0000000038223FF0
+#define P2	0x0000000000000000
+#define P3	0x0140000000000000
+#define P4	0x93D3AA2586A9BB7B
+#define P5	0x2C9088558A226AF0
+#define P6	0x7071D6BA0697D5A1
+#define P7	0xFE00400021385D1A
+#define P8	0x1629227BB6527E4E
+#define P9	0xD4A66E04AA631EEA
+#define P10 0xBC5664C6F237BCB4
+#define P11 0x166A30BEAF4CE221
+#define U0	0xD000EFC07FFFFFFF
 #endif
 
 #if defined(__APPLE__)
@@ -193,13 +222,31 @@
 
 .macro _RDCN0 i, j, k, R0, R1, R2 A, P
 	movq	8*\i(\A), %rax
+#if U0 == 0xFFFFFFFFFFFFFF
+	.if \j != 2
+		mulq	8*\j(\P)
+		addq	%rax, \R0
+		adcq	%rdx, \R1
+		adcq	$0, \R2
+	.endif
+#else
 	mulq	8*\j(\P)
 	addq	%rax, \R0
 	adcq	%rdx, \R1
 	adcq	$0, \R2
+#endif
 	.if \j > 1
 		_RDCN0 "(\i + 1)", "(\j - 1)", \k, \R0, \R1, \R2, \A, \P
 	.else
+#if U0 == 0xFFFFFFFFFFFFFFFF
+		addq	8*\k(\A), \R0
+		adcq	$0, \R1
+		adcq	$0, \R2
+		negq	\R0
+		movq	\R0, 8*\k(\A)
+		adcq	$0, \R1
+		adcq	$0, \R2
+#else
 		addq	8*\k(\A), \R0
 		adcq	$0, \R1
 		adcq	$0, \R2
@@ -210,6 +257,7 @@
 		addq	%rax , \R0
 		adcq	%rdx , \R1
 		adcq	$0   , \R2
+#endif
 		xorq	\R0, \R0
 	.endif
 .endm
@@ -219,11 +267,21 @@
 .endm
 
 .macro _RDCN1 i, j, k, l, R0, R1, R2 A, P
+#if U0 == 0xFFFFFFFFFFFFFF
+	.if \j != 2
+		movq	8*\i(\A), %rax
+		mulq	8*\j(\P)
+		addq	%rax, \R0
+		adcq	%rdx, \R1
+		adcq	$0, \R2
+	.endif
+#else
 	movq	8*\i(\A), %rax
 	mulq	8*\j(\P)
 	addq	%rax, \R0
 	adcq	%rdx, \R1
 	adcq	$0, \R2
+#endif
 	.if \j > \l
 		_RDCN1 "(\i + 1)", "(\j - 1)", \k, \l, \R0, \R1, \R2, \A, \P
 	.else
@@ -242,6 +300,12 @@
 // r8, r9, r10, r11, r12, r13, r14, r15, rbp, rbx, rsp, //rsi, rdi, //rax, rcx, rdx
 .macro FP_RDCN_LOW C, R0, R1, R2, A, P
 	xorq	\R1, \R1
+#if U0 == 0xFFFFFFFFFFFFFFFF
+	movq	0(\A), \R0
+	negq	\R0
+	movq	\R0 , 0(\A)
+	adcq	$0   , \R1
+#else
 	movq	$U0, %rcx
 
 	movq	0(\A), \R0
@@ -251,9 +315,9 @@
 	mulq	0(\P)
 	addq	%rax , \R0
 	adcq	%rdx , \R1
+#endif
 	xorq    \R2  , \R2
 	xorq    \R0  , \R0
-
 	RDCN0	0, 1, \R1, \R2, \R0, \A, \P
 	RDCN0	0, 2, \R2, \R0, \R1, \A, \P
 	RDCN0	0, 3, \R0, \R1, \R2, \A, \P
@@ -278,6 +342,10 @@
 	RDCN1	11,11,\R1, \R2, \R0, \A, \P
 	addq	184(\A), \R2
 	movq	\R2, 184(\A)
+#if FP_PRIME == 768
+	movq	$0, 192(\A)
+	adcq	$0, 192(\A)
+#endif
 
 	movq	96(\A), %r11
 	movq	104(\A), %r12
@@ -304,6 +372,9 @@
 	sbbq	p9(%rip), %r9
 	sbbq	p10(%rip), %r10
 	sbbq	p11(%rip), %rax
+#if FP_PRIME == 768
+	sbbq	$0, 192(\A)
+#endif
 
 	cmovc	96(\A), %r11
 	cmovc	104(\A), %r12

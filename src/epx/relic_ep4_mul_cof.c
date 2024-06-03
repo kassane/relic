@@ -25,14 +25,13 @@
  * @file
  *
  * Implementation of point multiplication of a prime elliptic curve over a
- * quartic extension by the curve cofactor.
+ * quartic extension field by the curve cofactor.
  *
  * @ingroup epx
  */
 
 #include "relic_core.h"
 #include "relic_md.h"
-#include "relic_tmpl_map.h"
 
 /*============================================================================*/
 /* Public definitions                                                         */
@@ -124,7 +123,6 @@ static void ep4_mul_cof_k16(ep4_t r, const ep4_t p) {
 		ep4_free(t4);
 		ep4_free(t5);
 		bn_free(x);
-
 	}
 }
 
@@ -198,7 +196,89 @@ static void ep4_mul_cof_n16(ep4_t r, const ep4_t p) {
 		ep4_free(t4);
 		ep4_free(t5);
 		bn_free(x);
+	}
+}
 
+/**
+ * Multiplies a point by the cofactor in a FM16 curve.
+ *
+ * @param[out] r			- the result.
+ * @param[in] p				- the point to multiply.
+ */
+static void ep4_mul_cof_fm16(ep4_t r, const ep4_t p) {
+	bn_t x;
+	ep4_t t0, t1, t2, t3;
+
+	ep4_null(t0);
+	ep4_null(t1);
+	ep4_null(t2);
+	ep4_null(t3);
+	bn_null(x);
+
+	RLC_TRY {
+		bn_new(x);
+		ep4_new(t0);
+		ep4_new(t1);
+		ep4_new(t2);
+		ep4_new(t3);
+
+		fp_prime_get_par(x);
+		if (bn_is_even(x)) {
+			bn_hlv(x, x);
+		} else {
+			RLC_THROW(ERR_NO_VALID);
+		}
+
+		/* [1 + u^7/2, u^6/2, u^5/2, u^4/2, u^3(2-u)/2, u^2(2-u)/2, u(2-u)/2, (2-u)/2] */
+
+		/* Compute [1 - u/2]\psi^7(P). */
+		ep4_mul_basic(t1, p, x);
+		ep4_sub(t0, p, t1);
+		ep4_frb(t0, t0, 7);
+		bn_dbl(x, x);
+		/* Compute [u - u^2/2]\psi^6(P). */
+		ep4_mul_basic(t2, t1, x);
+		ep4_dbl(t1, t1);
+		ep4_sub(t3, t1, t2);
+		ep4_frb(t3, t3, 6);
+		ep4_add(t0, t0, t3);
+		/* Compute [u^2 - u^3/2]\psi^5(P). */
+		ep4_mul_basic(t1, t2, x);
+		ep4_dbl(t2, t2);
+		ep4_sub(t3, t2, t1);
+		ep4_frb(t3, t3, 5);
+		ep4_add(t0, t0, t3);
+		/* Compute [u^3 - u^4/2]\psi^4(P). */
+		ep4_mul_basic(t2, t1, x);
+		ep4_dbl(t1, t1);
+		ep4_sub(t3, t1, t2);
+		ep4_frb(t3, t3, 4);
+		ep4_add(t0, t0, t3);
+		/* Compute [u^4/2]\psi^3(P). */
+		ep4_frb(t3, t2, 3);
+		ep4_add(t0, t0, t3);
+		/* Compute [u^5/2]\psi^2(P). */
+		ep4_mul_basic(t2, t2, x);
+		ep4_frb(t3, t2, 2);
+		ep4_add(t0, t0, t3);
+		/* Compute [u^6/2]\psi(P). */
+		ep4_mul_basic(t2, t2, x);
+		ep4_frb(t3, t2, 1);
+		ep4_add(t0, t0, t3);
+		/* Compute [1 + u^7/2]P. */
+		ep4_mul_basic(t2, t2, x);
+		ep4_add(t0, t0, t2);
+		ep4_add(t0, t0, p);
+
+		ep4_norm(r, t0);
+	} RLC_CATCH_ANY {
+		RLC_THROW(ERR_CAUGHT);
+	} RLC_FINALLY {
+		ep4_free(t0);
+		ep4_free(t1);
+		ep4_free(t2);
+		ep4_free(t3);
+		bn_free(x);
 	}
 }
 
@@ -280,17 +360,16 @@ void ep4_mul_cof(ep4_t r, const ep4_t p) {
 			case EP_N16:
 				ep4_mul_cof_n16(r, p);
 				break;
+			case EP_FM16:
+				ep4_mul_cof_fm16(r, p);
+				break;
 			case EP_B24:
 				ep4_mul_cof_b24(r, p);
 				break;
 			default:
 				/* Now, multiply by cofactor to get the correct group. */
 				ep4_curve_get_cof(k);
-				if (bn_bits(k) < RLC_DIG) {
-					ep4_mul_dig(r, p, k->dp[0]);
-				} else {
-					ep4_mul_basic(r, p, k);
-				}
+				ep4_mul_big(r, p, k);
 				break;
 		}
 	} RLC_CATCH_ANY {

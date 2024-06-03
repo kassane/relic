@@ -338,7 +338,7 @@ typedef fp18_t fp54_t[3];
 /**
  * Multiplies a quadratic extension field by the quadratic/cubic non-residue.
  * Computes C = A * E, where E is a non-square/non-cube in the quadratic
- * extension.
+ * extension field.
  *
  * @param[out] C			- the result.
  * @param[in] A				- the quadratic extension field element to multiply.
@@ -1399,6 +1399,15 @@ int fp2_field_get_qnr(void);
 void fp2_copy(fp2_t c, const fp2_t a);
 
 /**
+ * Conditionally copies the second argument to the first argument.
+ *
+ * @param[out] c			- the result.
+ * @param[in] a				- the quadratic extension field element to copy.
+ * @param[in] bit			- the condition bit to evaluate.
+ */
+void fp2_copy_sec(fp2_t c, const fp2_t a, dig_t bit);
+
+/**
  * Assigns zero to a quadratic extension field element.
  *
  * @param[out] a			- the quadratic extension field element to zero.
@@ -1725,7 +1734,7 @@ void fp2_exp_dig(fp2_t c, const fp2_t a, dig_t b);
 void fp2_exp_cyc(fp2_t c, const fp2_t a, const bn_t b);
 
 /**
- * Computes a power of a cyclotomic quadratic extension field element.
+ * Computes a power of two cyclotomic quadratic extension field elements.
  *
  * @param[out] e			- the result.
  * @param[in] a				- the first element to exponentiate.
@@ -1799,6 +1808,15 @@ int fp3_field_get_cnr(void);
  * @param[in] a				- the cubic extension field element to copy.
  */
 void fp3_copy(fp3_t c, const fp3_t a);
+
+/**
+ * Conditionally copies the second argument to the first argument.
+ *
+ * @param[out] c			- the result.
+ * @param[in] a				- the cubic extension field element to copy.
+ * @param[in] bit			- the condition bit to evaluate.
+ */
+void fp3_copy_sec(fp3_t c, const fp3_t a, dig_t bit);
 
 /**
  * Assigns zero to a cubic extension field element.
@@ -2107,9 +2125,18 @@ void fp4_field_init(void);
  * Copies the second argument to the first argument.
  *
  * @param[out] c			- the result.
- * @param[in] a				- the sextic extension field element to copy.
+ * @param[in] a				- the quartic extension field element to copy.
  */
 void fp4_copy(fp4_t c, const fp4_t a);
+
+/**
+ * Conditionally copies the second argument to the first argument.
+ *
+ * @param[out] c			- the result.
+ * @param[in] a				- the quartic extension field element to copy.
+ * @param[in] bit			- the condition bit to evaluate.
+ */
+void fp4_copy_sec(fp4_t c, const fp4_t a, dig_t bit);
 
 /**
  * Assigns zero to a quartic extension field element.
@@ -2417,6 +2444,16 @@ int fp4_srt(fp4_t c, const fp4_t a);
  */
 void fp6_copy(fp6_t c, const fp6_t a);
 
+
+/**
+ * Conditionally copies the second argument to the first argument.
+ *
+ * @param[out] c			- the result.
+ * @param[in] a				- the sextic extension field element to copy.
+ * @param[in] bit			- the condition bit to evaluate.
+ */
+void fp6_copy_sec(fp6_t c, const fp6_t a, dig_t bit);
+
 /**
  * Assigns zero to a sextic extension field element.
  *
@@ -2652,6 +2689,15 @@ void fp8_field_init(void);
 void fp8_copy(fp8_t c, const fp8_t a);
 
 /**
+ * Conditionally copies the second argument to the first argument.
+ *
+ * @param[out] c			- the result.
+ * @param[in] a				- the octic extension field element to copy.
+ * @param[in] bit			- the condition bit to evaluate.
+ */
+void fp8_copy_sec(fp8_t c, const fp8_t a, dig_t bit);
+
+/**
  * Assigns zero to an octic extension field element.
  *
  * @param[out] a			- the octic extension field element to zero.
@@ -2708,9 +2754,10 @@ void fp8_read_bin(fp8_t a, const uint8_t *bin, size_t len);
  * @param[out] bin			- the byte vector.
  * @param[in] len			- the buffer capacity.
  * @param[in] a				- the extension field element to write.
+ * @param[in] pack			- the flag to indicate compression.
  * @throw ERR_NO_BUFFER		- if the buffer capacity is not correct.
  */
-void fp8_write_bin(uint8_t *bin, size_t len, const fp8_t a);
+void fp8_write_bin(uint8_t *bin, size_t len, const fp8_t a, int pack);
 
 /**
  * Returns the result of a comparison between two octic extension field
@@ -2821,6 +2868,16 @@ void fp8_mul_art(fp8_t c, const fp8_t a);
  * @param[in] j				- the power of the constant.
  */
 void fp8_mul_frb(fp8_t c, const fp8_t a, int i, int j);
+
+/**
+ * Multiplies an octic extension field element by a digit.
+ * Computes c = a * b.
+ *
+ * @param[out] c			- the result.
+ * @param[in] a				- the octic extension field element.
+ * @param[in] b				- the digit to multiply.
+ */
+void fp8_mul_dig(fp8_t c, const fp8_t a, dig_t b);
 
 /**
  * Multiples a dense octic extension field element by a sparse element.
@@ -2938,6 +2995,18 @@ void fp8_exp_dig(fp8_t c, const fp8_t a, dig_t b);
 void fp8_exp_cyc(fp8_t c, const fp8_t a, const bn_t b);
 
 /**
+ * Computes a power of two cyclotomic octic extension field elements.
+ *
+ * @param[out] e			- the result.
+ * @param[in] a				- the first element to exponentiate.
+ * @param[in] b				- the first exponent.
+ * @param[in] c				- the second element to exponentiate.
+ * @param[in] d				- the second exponent.
+ */
+void fp8_exp_cyc_sim(fp8_t e, const fp8_t a, const bn_t b, const fp8_t c,
+		const bn_t d);
+
+/**
  * Computes a power of the Frobenius endomorphism of an octic extension field
  * element. Computes c = a^p^i.
  *
@@ -2972,6 +3041,15 @@ int fp8_srt(fp8_t c, const fp8_t a);
  * @param[in] a				- the nonic extension field element to copy.
  */
 void fp9_copy(fp9_t c, const fp9_t a);
+
+/**
+ * Conditionally copies the second argument to the first argument.
+ *
+ * @param[out] c			- the result.
+ * @param[in] a				- the nonic extension field element to copy.
+ * @param[in] bit			- the condition bit to evaluate.
+ */
+void fp9_copy_sec(fp9_t c, const fp9_t a, dig_t bit);
 
 /**
  * Assigns zero to a nonic extension field element.
@@ -3210,6 +3288,15 @@ void fp9_frb(fp9_t c, const fp9_t a, int i);
  * @param[in] a				- the dodecic extension field element to copy.
  */
 void fp12_copy(fp12_t c, const fp12_t a);
+
+/**
+ * Conditionally copies the second argument to the first argument.
+ *
+ * @param[out] c			- the result.
+ * @param[in] a				- the dodecic extension field element to copy.
+ * @param[in] bit			- the condition bit to evaluate.
+ */
+void fp12_copy_sec(fp12_t c, const fp12_t a, dig_t bit);
 
 /**
  * Assigns zero to a dodecic extension field element.
@@ -3549,7 +3636,17 @@ void fp12_exp_dig(fp12_t c, const fp12_t a, dig_t b);
 void fp12_exp_cyc(fp12_t c, const fp12_t a, const bn_t b);
 
 /**
- * Computes a power of a cyclotomic dodecic extension field element.
+ * Computes a power of a cyclotomic dodecic extension field element in the
+ * prime-order subgroup.
+ *
+ * @param[out] c			- the result.
+ * @param[in] a				- the basis.
+ * @param[in] b				- the exponent.
+ */
+void fp12_exp_cyc_gls(fp12_t c, const fp12_t a, const bn_t b);
+
+/**
+ * Computes a power of two cyclotomic dodecic extension field elements.
  *
  * @param[out] e			- the result.
  * @param[in] a				- the first element to exponentiate.
@@ -3605,7 +3702,6 @@ void fp12_pck_max(fp12_t c, const fp12_t a);
  */
 int fp12_upk_max(fp12_t c, const fp12_t a);
 
-
 /**
  * Initializes the sextadecic extension field arithmetic module.
  */
@@ -3618,6 +3714,15 @@ void fp16_field_init(void);
  * @param[in] a				- the sextadecic extension field element to copy.
  */
 void fp16_copy(fp16_t c, const fp16_t a);
+
+/**
+ * Conditionally copies the second argument to the first argument.
+ *
+ * @param[out] c			- the result.
+ * @param[in] a				- the sextadecic extension field element to copy.
+ * @param[in] bit			- the condition bit to evaluate.
+ */
+void fp16_copy_sec(fp16_t c, const fp16_t a, dig_t bit);
 
 /**
  * Assigns zero to an sextadecic extension field element.
@@ -3909,6 +4014,28 @@ void fp16_exp_dig(fp16_t c, const fp16_t a, dig_t b);
 void fp16_exp_cyc(fp16_t c, const fp16_t a, const bn_t b);
 
 /**
+ * Computes a power of a cyclotomic sextadecic extension field element in the
+ * prime-order subgroup.
+ *
+ * @param[out] c			- the result.
+ * @param[in] a				- the basis.
+ * @param[in] b				- the exponent.
+ */
+void fp16_exp_cyc_gls(fp16_t c, const fp16_t a, const bn_t b);
+
+/**
+ * Computes a power of two cyclotomic sextadecic extension field elements.
+ *
+ * @param[out] e			- the result.
+ * @param[in] a				- the first element to exponentiate.
+ * @param[in] b				- the first exponent.
+ * @param[in] c				- the second element to exponentiate.
+ * @param[in] d				- the second exponent.
+ */
+void fp16_exp_cyc_sim(fp16_t e, const fp16_t a, const bn_t b, const fp16_t c,
+		const bn_t d);
+
+/**
  * Computes a power of the Frobenius endomorphism of an sextadecic extension
  * field element. Computes c = a^p^i.
  *
@@ -3943,6 +4070,15 @@ int fp16_srt(fp16_t c, const fp16_t a);
  * @param[in] a				- the octdecic extension field element to copy.
  */
 void fp18_copy(fp18_t c, const fp18_t a);
+
+/**
+ * Conditionally copies the second argument to the first argument.
+ *
+ * @param[out] c			- the result.
+ * @param[in] a				- the octdecic extension field element to copy.
+ * @param[in] bit			- the condition bit to evaluate.
+ */
+void fp18_copy_sec(fp18_t c, const fp18_t a, dig_t bit);
 
 /**
  * Assigns zero to an octdecic extension field element.
@@ -4282,7 +4418,17 @@ void fp18_exp_dig(fp18_t c, const fp18_t a, dig_t b);
 void fp18_exp_cyc(fp18_t c, const fp18_t a, const bn_t b);
 
 /**
- * Computes a power of a cyclotomic octdecic extension field element.
+ * Computes a power of a cyclotomic octdecic extension field element in the
+ * prime-order subgroup.
+ *
+ * @param[out] c			- the result.
+ * @param[in] a				- the basis.
+ * @param[in] b				- the exponent.
+ */
+void fp18_exp_cyc_gls(fp18_t c, const fp18_t a, const bn_t b);
+
+/**
+ * Computes a power of two cyclotomic octdecic extension field elements.
  *
  * @param[out] e			- the result.
  * @param[in] a				- the first element to exponentiate.
@@ -4290,7 +4436,8 @@ void fp18_exp_cyc(fp18_t c, const fp18_t a, const bn_t b);
  * @param[in] c				- the second element to exponentiate.
  * @param[in] d				- the second exponent.
  */
-void fp18_exp_cyc_sim(fp18_t e, const fp18_t a, const bn_t b, const fp18_t c, const bn_t d);
+void fp18_exp_cyc_sim(fp18_t e, const fp18_t a, const bn_t b, const fp18_t c,
+		const bn_t d);
 
 /**
  * Computes a power of a cyclotomic octdecic extension field element.
@@ -4344,6 +4491,15 @@ int fp18_upk_max(fp18_t c, const fp18_t a);
  * @param[in] a				- the 24-degree extension field element to copy.
  */
 void fp24_copy(fp24_t c, const fp24_t a);
+
+/**
+ * Conditionally copies the second argument to the first argument.
+ *
+ * @param[out] c			- the result.
+ * @param[in] a				- the 24-degree extension field element to copy.
+ * @param[in] bit			- the condition bit to evaluate.
+ */
+void fp24_copy_sec(fp24_t c, const fp24_t a, dig_t bit);
 
 /**
  * Assigns zero to a 24-degree extension field element.
@@ -4672,7 +4828,17 @@ void fp24_exp_dig(fp24_t c, const fp24_t a, dig_t b);
 void fp24_exp_cyc(fp24_t c, const fp24_t a, const bn_t b);
 
 /**
- * Computes a power of a cyclotomic dodecic extension field element.
+ * Computes a power of a cyclotomic 24-extension field element in the
+ * prime-order subgroup.
+ *
+ * @param[out] c			- the result.
+ * @param[in] a				- the basis.
+ * @param[in] b				- the exponent.
+ */
+void fp24_exp_cyc_gls(fp24_t c, const fp24_t a, const bn_t b);
+
+/**
+ * Computes a power of two cyclotomic dodecic extension field elements.
  *
  * @param[out] e			- the result.
  * @param[in] a				- the first element to exponentiate.
@@ -4717,6 +4883,15 @@ int fp24_upk(fp24_t c, const fp24_t a);
  * @param[in] a				- the 48-extension field element to copy.
  */
 void fp48_copy(fp48_t c, const fp48_t a);
+
+/**
+ * Conditionally copies the second argument to the first argument.
+ *
+ * @param[out] c			- the result.
+ * @param[in] a				- the 48-degree extension field element to copy.
+ * @param[in] bit			- the condition bit to evaluate.
+ */
+void fp48_copy_sec(fp48_t c, const fp48_t a, dig_t bit);
 
 /**
  * Assigns zero to a 48-extension field element.
@@ -5028,6 +5203,16 @@ void fp48_exp_dig(fp48_t c, const fp48_t a, dig_t b);
 void fp48_exp_cyc(fp48_t c, const fp48_t a, const bn_t b);
 
 /**
+ * Computes a power of a cyclotomic 48-extension field element in the
+ * prime-order subgroup.
+ *
+ * @param[out] c			- the result.
+ * @param[in] a				- the basis.
+ * @param[in] b				- the exponent.
+ */
+void fp48_exp_cyc_gls(fp48_t c, const fp48_t a, const bn_t b);
+
+/**
  * Computes a power of a cyclotomic 48-extension field element.
  *
  * @param[out] c			- the result.
@@ -5037,6 +5222,18 @@ void fp48_exp_cyc(fp48_t c, const fp48_t a, const bn_t b);
  * @param[in] s				- the sign of the exponent.
  */
 void fp48_exp_cyc_sps(fp48_t c, const fp48_t a, const int *b, size_t l, int s);
+
+/**
+ * Computes a power of two cyclotomic 48-extension field elements.
+ *
+ * @param[out] e			- the result.
+ * @param[in] a				- the first element to exponentiate.
+ * @param[in] b				- the first exponent.
+ * @param[in] c				- the second element to exponentiate.
+ * @param[in] d				- the second exponent.
+ */
+void fp48_exp_cyc_sim(fp48_t e, const fp48_t a, const bn_t b, const fp48_t c,
+		const bn_t d);
 
 /**
  * Compresses a 48-extension field element.
@@ -5062,6 +5259,15 @@ int fp48_upk(fp48_t c, const fp48_t a);
  * @param[in] a				- the 54-extension field element to copy.
  */
 void fp54_copy(fp54_t c, const fp54_t a);
+
+/**
+ * Conditionally copies the second argument to the first argument.
+ *
+ * @param[out] c			- the result.
+ * @param[in] a				- the 54-degree extension field element to copy.
+ * @param[in] bit			- the condition bit to evaluate.
+ */
+void fp54_copy_sec(fp54_t c, const fp54_t a, dig_t bit);
 
 /**
  * Assigns zero to a 54-extension field element.

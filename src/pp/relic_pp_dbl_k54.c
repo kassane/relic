@@ -96,7 +96,7 @@ static void ep9_dbl_basic(fp9_t s, fp9_t rx, fp9_t ry) {
 /* Public definitions                                                         */
 /*============================================================================*/
 
-#if EP_ADD == PROJC || !defined(STRIP)
+#if EP_ADD == BASIC || !defined(STRIP)
 
 void pp_dbl_k54_basic(fp54_t l, fp9_t rx, fp9_t ry, const ep_t p) {
 	fp9_t s, tx, ty;
@@ -141,7 +141,7 @@ void pp_dbl_k54_basic(fp54_t l, fp9_t rx, fp9_t ry, const ep_t p) {
 
 #endif
 
-#if EP_ADD == PROJC || !defined(STRIP)
+#if EP_ADD == PROJC || EP_ADD == JACOB || !defined(STRIP)
 
 void pp_dbl_k54_projc(fp54_t l, fp9_t rx, fp9_t ry, fp9_t rz, const ep_t p) {
 	fp9_t t0, t1, t2, t3, t4, t5, t6;

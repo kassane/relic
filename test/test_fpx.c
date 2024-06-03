@@ -476,10 +476,6 @@ static int multiplication2(void) {
 					fp2_mul_art(c, a);
 					break;
 				case 3:
-					fp_set_dig(c[0], 1);
-					fp_set_dig(c[1], 1);
-					fp2_mul(c, a, c);
-					break;
 				case 7:
 					fp_set_dig(c[0], fp2_field_get_qnr());
 					fp_set_dig(c[1], 1);
@@ -1333,8 +1329,13 @@ static int multiplication3(void) {
 			fp3_rand(a);
 			fp3_mul_nor(b, a);
 			switch (fp_prime_get_mod18()) {
+				case 1:
 				case 7:
 					fp_set_dig(c[0], fp3_field_get_cnr());
+					if (fp3_field_get_cnr() < 0) {
+						fp_set_dig(c[0], -fp3_field_get_cnr());
+						fp_neg(c[0], c[0]);
+					}
 					fp_set_dig(c[1], 1);
 					fp_zero(c[2]);
 					fp3_mul(c, a, c);
@@ -2948,7 +2949,7 @@ static int util8(void) {
 
 		TEST_CASE("reading and writing a finite field element are consistent") {
 			fp8_rand(a);
-			fp8_write_bin(bin, sizeof(bin), a);
+			fp8_write_bin(bin, sizeof(bin), a, 0);
 			fp8_read_bin(b, bin, sizeof(bin));
 			TEST_ASSERT(fp8_cmp(a, b) == RLC_EQ, end);
 		}
@@ -5351,7 +5352,7 @@ static int cyclotomic16(void) {
 			TEST_ASSERT(fp16_cmp(b, c) == RLC_EQ, end);
 		} TEST_END;
 
-        TEST_CASE("cyclotomic exponentiation is correct") {
+		TEST_CASE("cyclotomic exponentiation is correct") {
 			fp16_rand(a);
 			fp16_conv_cyc(a, a);
 			bn_zero(f);
@@ -5370,7 +5371,41 @@ static int cyclotomic16(void) {
 			fp16_exp_cyc(c, a, f);
 			fp16_inv_cyc(c, c);
 			TEST_ASSERT(fp16_cmp(b, c) == RLC_EQ, end);
-        } TEST_END;
+			/* Try sparse exponents as well. */
+			bn_set_2b(f, RLC_FP_BITS - 1);
+			bn_set_bit(f, RLC_FP_BITS / 2, 1);
+			bn_set_bit(f, 0, 1);
+			fp16_rand(a);
+			fp16_conv_cyc(a, a);
+			fp16_exp_cyc(b, a, f);
+			bn_neg(f, f);
+			fp16_exp_cyc(c, a, f);
+			fp16_inv_cyc(c, c);
+			TEST_ASSERT(fp16_cmp(b, c) == RLC_EQ, end);
+		} TEST_END;
+
+		if (ep_curve_is_pairf() && ep_curve_embed() == 16) {
+			TEST_CASE("cyclotomic exponentiation in subgroup is correct") {
+				fp16_rand(a);
+				pp_exp_k16(a, a);
+				bn_zero(f);
+				fp16_exp_cyc(c, a, f);
+				TEST_ASSERT(fp16_cmp_dig(c, 1) == RLC_EQ, end);
+				bn_set_dig(f, 1);
+				fp16_exp_cyc(c, a, f);
+				TEST_ASSERT(fp16_cmp(c, a) == RLC_EQ, end);
+				bn_rand(f, RLC_POS, RLC_FP_BITS);
+				fp16_exp(b, a, f);
+				fp16_exp_cyc(c, a, f);
+				TEST_ASSERT(fp16_cmp(b, c) == RLC_EQ, end);
+				bn_rand(f, RLC_POS, RLC_FP_BITS);
+				fp16_exp_cyc(b, a, f);
+				bn_neg(f, f);
+				fp16_exp_cyc(c, a, f);
+				fp16_inv_cyc(c, c);
+				TEST_ASSERT(fp16_cmp(b, c) == RLC_EQ, end);
+			} TEST_END;
+		}
 	}
 	RLC_CATCH_ANY {
 		util_print("FATAL ERROR!\n");
@@ -6087,40 +6122,37 @@ static int cyclotomic18(void) {
 		} TEST_END;
 #endif
 
-		if (ep_curve_is_pairf() == EP_K18) {
-	        TEST_CASE("cyclotomic exponentiation is correct") {
-				fp18_rand(a);
-				fp18_conv_cyc(a, a);
-				pp_exp_k18(a, a);
-				bn_zero(f);
-				fp18_exp_cyc(c, a, f);
-				TEST_ASSERT(fp18_cmp_dig(c, 1) == RLC_EQ, end);
-				bn_set_dig(f, 1);
-				fp18_exp_cyc(c, a, f);
-				TEST_ASSERT(fp18_cmp(c, a) == RLC_EQ, end);
-				bn_rand(f, RLC_POS, RLC_FP_BITS);
-				fp18_exp(b, a, f);
-				fp18_exp_cyc(c, a, f);
-				TEST_ASSERT(fp18_cmp(b, c) == RLC_EQ, end);
-				bn_rand(f, RLC_POS, RLC_FP_BITS);
-				fp18_exp_cyc(b, a, f);
-				bn_neg(f, f);
-				fp18_exp_cyc(c, a, f);
-				fp18_inv_cyc(c, c);
-				TEST_ASSERT(fp18_cmp(b, c) == RLC_EQ, end);
-				/* Try sparse exponents as well. */
-				bn_set_2b(f, RLC_FP_BITS - 1);
-				bn_set_bit(f, RLC_FP_BITS / 2, 1);
-				bn_set_bit(f, 0, 1);
-				fp18_rand(a);
-				fp18_conv_cyc(a, a);
-				fp18_exp_cyc(b, a, f);
-				bn_neg(f, f);
-				fp18_exp_cyc(c, a, f);
-				fp18_inv_cyc(c, c);
-				TEST_ASSERT(fp18_cmp(b, c) == RLC_EQ, end);
-	        } TEST_END;
-		}
+		TEST_CASE("cyclotomic exponentiation is correct") {
+			fp18_rand(a);
+			fp18_conv_cyc(a, a);
+			bn_zero(f);
+			fp18_exp_cyc(c, a, f);
+			TEST_ASSERT(fp18_cmp_dig(c, 1) == RLC_EQ, end);
+			bn_set_dig(f, 1);
+			fp18_exp_cyc(c, a, f);
+			TEST_ASSERT(fp18_cmp(c, a) == RLC_EQ, end);
+			bn_rand(f, RLC_POS, RLC_FP_BITS);
+			fp18_exp(b, a, f);
+			fp18_exp_cyc(c, a, f);
+			TEST_ASSERT(fp18_cmp(b, c) == RLC_EQ, end);
+			bn_rand(f, RLC_POS, RLC_FP_BITS);
+			fp18_exp_cyc(b, a, f);
+			bn_neg(f, f);
+			fp18_exp_cyc(c, a, f);
+			fp18_inv_cyc(c, c);
+			TEST_ASSERT(fp18_cmp(b, c) == RLC_EQ, end);
+			/* Try sparse exponents as well. */
+			bn_set_2b(f, RLC_FP_BITS - 1);
+			bn_set_bit(f, RLC_FP_BITS / 2, 1);
+			bn_set_bit(f, 0, 1);
+			fp18_rand(a);
+			fp18_conv_cyc(a, a);
+			fp18_exp_cyc(b, a, f);
+			bn_neg(f, f);
+			fp18_exp_cyc(c, a, f);
+			fp18_inv_cyc(c, c);
+			TEST_ASSERT(fp18_cmp(b, c) == RLC_EQ, end);
+		} TEST_END;
 
 		TEST_CASE("sparse cyclotomic exponentiation is correct") {
 			int g[3] = {0, 0, RLC_FP_BITS - 1};
@@ -8487,7 +8519,9 @@ static int inversion54(void) {
 			fp54_conv_cyc(a, a);
 			fp54_inv(b, a);
 			fp54_inv_cyc(c, a);
-			TEST_ASSERT(fp54_cmp(b, c) == RLC_EQ, end);
+			fp18_print(b[0]);
+			fp18_print(c[0]);
+			TEST_ASSERT(fp18_cmp(b[0], c[0]) == RLC_EQ, end);
 		} TEST_END;
 	}
 	RLC_CATCH_ANY {
@@ -8655,7 +8689,7 @@ int main(void) {
 	}
 
 	/* Only execute these if there is an assigned cubic non-residue. */
-	if (fp_prime_get_cnr()) {
+	if (fp_prime_get_cnr() && (ep_curve_embed() >= 3)) {
 		util_print("\n-- Cubic extension: %d as CNR\n", fp_prime_get_cnr());
 		util_banner("Utilities:", 1);
 
@@ -8718,7 +8752,7 @@ int main(void) {
 	}
 
 	/* Fp^4 is defined as a quadratic extension of Fp^2. */
-	if (fp_prime_get_qnr()) {
+	if (fp_prime_get_qnr() && (ep_curve_embed() >= 4)) {
 		util_print("\n-- Quartic extension: (i + %d) as QNR\n",
 				fp2_field_get_qnr());
 		util_banner("Utilities:", 1);
@@ -8782,7 +8816,7 @@ int main(void) {
 	}
 
 	/* Fp^6 is defined as a cubic extension of Fp^2. */
-	if (fp_prime_get_qnr() && fp_prime_get_cnr()) {
+	if (fp_prime_get_qnr() && fp_prime_get_cnr() && (ep_curve_embed() >= 6)) {
 		util_print("\n-- Sextic extension: (i + %d) as CNR\n",
 				fp2_field_get_qnr());
 		util_banner("Utilities:", 1);
@@ -8835,7 +8869,7 @@ int main(void) {
 		}
 	}
 
-	if (fp_prime_get_qnr() && (ep_param_embed() >= 8)) {
+	if (fp_prime_get_qnr() && (ep_curve_embed() >= 8)) {
 		util_banner("Octic extension: (j) as CNR", 0);
 		util_banner("Utilities:", 1);
 
@@ -8898,7 +8932,7 @@ int main(void) {
 	}
 
 	/* Only execute these if there is an assigned cubic non-residue. */
-	if (fp_prime_get_cnr() && (ep_param_embed() >= 9)) {
+	if (fp_prime_get_cnr() && (ep_curve_embed() >= 9)) {
 		util_print("\n-- Nonic extension: (j + %d) as CNR\n",
 				fp3_field_get_cnr());
 		util_banner("Utilities:", 1);
@@ -8951,7 +8985,8 @@ int main(void) {
 		}
 	}
 
-	if (fp_prime_get_qnr() && fp_prime_get_cnr() && (ep_param_embed() >= 12)) {
+	if (fp_prime_get_qnr() && fp_prime_get_cnr() &&
+			(ep_curve_embed() >= 12) && (ep_curve_embed() != 16)) {
 		util_banner("Dodecic extension:", 0);
 		util_banner("Utilities:", 1);
 
@@ -9008,7 +9043,7 @@ int main(void) {
 		}
 	}
 
-	if (fp_prime_get_qnr() && (ep_param_embed() >= 16)) {
+	if (fp_prime_get_qnr() && (ep_curve_embed() >= 16)) {
 		util_banner("Sextadecic extension:", 0);
 		util_banner("Utilities:", 1);
 
@@ -9070,7 +9105,7 @@ int main(void) {
 		}
 	}
 
-	if (fp_prime_get_cnr() && (ep_param_embed() >= 18)) {
+	if (fp_prime_get_cnr() && (ep_curve_embed() >= 18)) {
 		util_banner("Octdecic extension:", 0);
 		util_banner("Utilities:", 1);
 
@@ -9127,7 +9162,7 @@ int main(void) {
 		}
 	}
 
-	if (fp_prime_get_qnr() && (ep_param_embed() >= 24)) {
+	if (fp_prime_get_qnr() && (ep_curve_embed() >= 24)) {
 		util_banner("Extension of degree 24:", 0);
 		util_banner("Utilities:", 1);
 
@@ -9184,7 +9219,7 @@ int main(void) {
 		}
 	}
 
-	if (fp_prime_get_qnr() && (ep_param_embed() >= 48)) {
+	if (fp_prime_get_qnr() && (ep_curve_embed() >= 48)) {
 		util_banner("Extension of degree 48:", 0);
 		util_banner("Utilities:", 1);
 
@@ -9241,7 +9276,7 @@ int main(void) {
 		}
 	}
 
-	if (fp_prime_get_cnr() && (ep_param_embed() == 54)) {
+	if (fp_prime_get_cnr() && (ep_curve_embed() == 54)) {
 		util_banner("Extension of degree 54:", 0);
 		util_banner("Utilities:", 1);
 

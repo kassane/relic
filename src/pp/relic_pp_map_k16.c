@@ -198,29 +198,37 @@ static void pp_mil_lit_k16(fp16_t r, ep_t *t, ep_t *p, ep4_t *q, int m, bn_t a) 
  * @param[in] p				- the second point of the pairing, in G_1.
  * @param[in] a				- the loop parameter.
  */
-static void pp_fin_k16_oatep(fp16_t r, ep4_t t, ep4_t q, ep_t p) {
+static void pp_fin_k16_oatep(fp16_t r, ep4_t t, const ep4_t q, const ep_t p) {
 	ep4_t q1, q2;
 	fp16_t tmp;
+	ep_t _p;
 
 	fp16_null(tmp);
 	ep4_null(q1);
 	ep4_null(q2);
+	ep_null(_p);
 
 	RLC_TRY {
 		ep4_new(q1);
 		ep4_new(q2);
 		fp16_new(tmp);
-		fp16_zero(tmp);
+		ep_new(_p);
 
-#if EP_ADD == PROJC
-		fp_neg(p->x, p->x);
+#if EP_ADD == BASIC
+		ep_neg(_p, p);
+#else
+		fp_neg(_p->x, p->x);
+		fp_copy(_p->y, p->y);
 #endif
+
+		fp16_zero(tmp);
 		ep4_frb(q1, q, 1);
-		pp_add_k16(tmp, t, q1, p);
+		pp_add_k16(tmp, t, q1, _p);
 		fp16_frb(tmp, tmp, 3);
 		fp16_mul_dxs(r, r, tmp);
 
-		pp_dbl_k16(tmp, q2, q, p);
+		fp16_zero(tmp);
+		pp_dbl_k16(tmp, q2, q, _p);
 		fp16_mul_dxs(r, r, tmp);
 	} RLC_CATCH_ANY {
 		RLC_THROW(ERR_CAUGHT);
@@ -228,6 +236,7 @@ static void pp_fin_k16_oatep(fp16_t r, ep4_t t, ep4_t q, ep_t p) {
 		fp16_free(tmp);
 		ep4_free(q1);
 		ep4_free(q2);
+		ep_free(_p);
 	}
 }
 
@@ -489,6 +498,7 @@ void pp_map_oatep_k16(fp16_t r, const ep_t p, const ep4_t q) {
 
 		if (!ep_is_infty(_p[0]) && !ep4_is_infty(_q[0])) {
 			switch (ep_curve_is_pairf()) {
+				case EP_FM16:
 				case EP_N16:
 					/* r = f_{|a|,Q}(P). */
 					pp_mil_k16(r, t, _q, _p, 1, a);
@@ -559,6 +569,7 @@ void pp_map_sim_oatep_k16(fp16_t r, const ep_t *p, const ep4_t *q, int m) {
 
 		if (j > 0) {
 			switch (ep_curve_is_pairf()) {
+				case EP_FM16:
 				case EP_N16:
 					/* r = f_{|a|,Q}(P). */
 					pp_mil_k16(r, t, _q, _p, j, a);

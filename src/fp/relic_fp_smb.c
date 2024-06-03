@@ -37,25 +37,130 @@
 /* Private definitions                                                        */
 /*============================================================================*/
 
-#if FP_SMB == JMPDS || !defined(STRIP)
-
+#if FP_SMB == BINAR || !defined(STRIP)
 /**
- * Conditionally negate a digit vector using two's complement representation.
- *
- * @param[out] c 		- the result.
- * @param[in] a 		- the digit vector to conditionally negate.
- * @param[in] sa 		- the sign of the digit vector.
- * @param[in] n			- the number of digits to conditionally negate.
+ * Approach heavily inpired in the blst implementation of the algorithm.
  */
-static void bn_negs_low(dig_t c[], const dig_t a[], dig_t sa, size_t n) {
-	dig_t carry = sa & 1;
+static dig_t porninstep(dis_t m[4],const dig_t f[2], const dig_t g[2], 
+		dig_t k, size_t s) {
+	dig_t limbx, ai = 1, bi = 0, ci = 0, di = 1;
+	dig_t g_lo = g[0], g_hi = g[1], f_lo = f[0], f_hi = f[1];
+	dig_t t_lo, t_hi, odd, borrow, xorm;
 
-	sa = -sa;
-	for (int i = 0; i < n; i++) {
-		c[i] = (a[i] ^ sa) + carry;
-		carry = (c[i] < carry);
+	/* Unrolling twice gives some small speedup. */
+	for (size_t i = 0; i < s; i+=2) {
+		odd = 0 - (g_lo & 1);
+
+		/* g_ -= f_ if g_ is odd */
+		t_lo = g_lo, t_hi = g_hi;
+
+		borrow = 0;
+		limbx = g_lo - (f_lo & odd);
+		borrow = (g_lo < limbx);
+		g_lo = limbx;
+
+		limbx = g_hi - (f_hi & odd);
+		xorm = limbx - borrow;
+		borrow = -((g_hi < limbx) || (borrow && !limbx));
+		g_hi = xorm;
+
+		k += ((t_lo & f_lo) >> 1) & borrow;
+
+		/* negate g_-f_ if it borrowed */
+		g_lo ^= borrow;
+		g_hi ^= borrow;
+		limbx = g_lo + (borrow & 1);
+		g_hi += (g_lo < limbx);
+		g_lo = limbx;
+
+		/* f_=g_ if g_-f_ borrowed */
+		f_lo = ((t_lo ^ f_lo) & borrow) ^ f_lo;
+		f_hi = ((t_hi ^ f_hi) & borrow) ^ f_hi;
+
+		/* exchange ai and ci if g_-f_ borrowed */
+		xorm = (ai ^ ci) & borrow;
+		ai ^= xorm;
+		ci ^= xorm;
+
+		/* exchange bi and di if g_-f_ borrowed */
+		xorm = (bi ^ di) & borrow;
+		bi ^= xorm;
+		di ^= xorm;
+
+		/* subtract if g_ was odd */
+		ai -= ci & odd;
+		bi -= di & odd;
+
+		ci <<= 1;
+		di <<= 1;
+		g_lo >>= 1;
+		g_lo |= g_hi << (RLC_DIG - 1);
+		g_hi >>= 1;
+
+		k += (f_lo + 2) >> 2;
+
+		odd = 0 - (g_lo & 1);
+
+		/* g_ -= f_ if g_ is odd */
+		t_lo = g_lo, t_hi = g_hi;
+
+		borrow = 0;
+		limbx = g_lo - (f_lo & odd);
+		borrow = (g_lo < limbx);
+		g_lo = limbx;
+
+		limbx = g_hi - (f_hi & odd);
+		xorm = limbx - borrow;
+		borrow = -((g_hi < limbx) || (borrow && !limbx));
+		g_hi = xorm;
+
+		k += ((t_lo & f_lo) >> 1) & borrow;
+
+		/* negate g_-f_ if it borrowed */
+		g_lo ^= borrow;
+		g_hi ^= borrow;
+		limbx = g_lo + (borrow & 1);
+		g_hi += (g_lo < limbx);
+		g_lo = limbx;
+
+		/* f_=g_ if g_-f_ borrowed */
+		f_lo = ((t_lo ^ f_lo) & borrow) ^ f_lo;
+		f_hi = ((t_hi ^ f_hi) & borrow) ^ f_hi;
+
+		/* exchange ai and ci if g_-f_ borrowed */
+		xorm = (ai ^ ci) & borrow;
+		ai ^= xorm;
+		ci ^= xorm;
+
+		/* exchange bi and di if g_-f_ borrowed */
+		xorm = (bi ^ di) & borrow;
+		bi ^= xorm;
+		di ^= xorm;
+
+		/* subtract if g_ was odd */
+		ai -= ci & odd;
+		bi -= di & odd;
+
+		ci <<= 1;
+		di <<= 1;
+		g_lo >>= 1;
+		g_lo |= g_hi << (RLC_DIG - 1);
+		g_hi >>= 1;
+
+		k += (f_lo + 2) >> 2;
 	}
+
+	m[0] = ai;
+	m[1] = bi;
+	m[2] = ci;
+	m[3] = di;
+
+	return k;
 }
+
+#endif
+
+#if FP_SMB == JMPDS || !defined(STRIP)
 
 static dis_t jumpdivstep(dis_t m[4], dig_t *k, dis_t delta, dis_t y, dis_t x, 
 		int s) {
@@ -163,6 +268,97 @@ int fp_smb_basic(const fp_t a) {
 
 #endif
 
+#if FP_SMB == BINAR || !defined(STRIP)
+
+#define RLC_LSH(H, L, I)													\
+		(H << I) | (L & -(I != 0)) >> ((RLC_DIG - I) & (RLC_DIG - 1))
+
+int fp_smb_binar(const fp_t a) {
+	const size_t s = RLC_DIG - 2;
+	dv_t f, g, t, t0, t1;
+	dig_t g_[2], f_[2], neg, l, g_hi, g_lo, f_hi, f_lo, mask, k = 0;
+	dis_t m[4];
+	int iterations = 2 * RLC_FP_DIGS * RLC_DIG;
+
+	if (fp_is_zero(a)) {
+		return 0;
+	}
+
+	dv_null(f);
+	dv_null(g);
+	dv_null(t);
+	dv_null(t0);
+	dv_null(t1);
+
+	RLC_TRY {
+		dv_new(f);
+		dv_new(g);
+		dv_new(t);
+		dv_new(t0);
+		dv_new(t1);
+
+		dv_zero(t, 2 * RLC_FP_DIGS);
+		dv_copy(f, fp_prime_get(), RLC_FP_DIGS);
+#if FP_RDC == MONTY
+		/* Convert a from Montgomery form. */
+		fp_copy(t, a);
+		fp_rdcn_low(g, t);
+#else
+		fp_copy(g, a);
+#endif
+
+		for (size_t len, i = 0; i < iterations / s; i++) {
+			f_hi = f[RLC_FP_DIGS - 1], f_lo = f[RLC_FP_DIGS - 2];
+			g_hi = g[RLC_FP_DIGS - 1], g_lo = g[RLC_FP_DIGS - 2];
+			for (int j = RLC_FP_DIGS - 2; j >= 0; j--) {
+				l = (f_hi | g_hi);
+				l = ~l & (l - 1);
+				mask = -(l >> (RLC_DIG - 1));
+				f_hi = ((f_lo ^ f_hi) & mask) ^ f_hi;
+				g_hi = ((g_lo ^ g_hi) & mask) ^ g_hi;
+				f_lo = ((f[j] ^ f_lo) & mask) ^ f_lo;
+				g_lo = ((g[j] ^ g_lo) & mask) ^ g_lo;
+			}
+			len = RLC_DIG - util_bits_dig(f_hi | g_hi);
+			f_[0] = f[0], f_[1] = RLC_LSH(f_hi, f_lo, len);
+			g_[0] = g[0], g_[1] = RLC_LSH(g_hi, g_lo, len);
+
+			k = porninstep(m, f_, g_, k, s);
+
+			t0[RLC_FP_DIGS] = bn_muls_low(t0, g, RLC_POS, m[0], RLC_FP_DIGS);
+			t1[RLC_FP_DIGS] = bn_muls_low(t1, f, RLC_POS, m[1], RLC_FP_DIGS);
+			bn_addn_low(t0, t0, t1, RLC_FP_DIGS + 1);
+			neg = RLC_SIGN(t0[RLC_FP_DIGS]);
+			bn_rshb_low(t, t0, RLC_FP_DIGS + 1, (RLC_DIG - 2));
+			bn_negs_low(t, t, neg, RLC_FP_DIGS);
+
+			t0[RLC_FP_DIGS] = bn_muls_low(t0, g, RLC_POS, m[2], RLC_FP_DIGS);
+			t1[RLC_FP_DIGS] = bn_muls_low(t1, f, RLC_POS, m[3], RLC_FP_DIGS);
+			bn_addn_low(t1, t1, t0, RLC_FP_DIGS + 1);
+			bn_rshb_low(f, t1, RLC_FP_DIGS + 1, (RLC_DIG - 2));
+			bn_negs_low(f, f, RLC_SIGN(t1[RLC_FP_DIGS]), RLC_FP_DIGS);
+
+			fp_copy(g, t);
+			k += (f[0] >> 1) & neg;
+		}
+
+		k = porninstep(m, g, f, k, iterations % s);
+
+	} RLC_CATCH_ANY {
+		RLC_THROW(ERR_CAUGHT)
+	} RLC_FINALLY {
+		dv_free(f);
+		dv_free(g);
+		dv_free(t);
+		dv_free(t0);
+		dv_free(t1);
+	}
+
+	return (k & 1 ? -1 : 1);
+}
+
+#endif
+
 #if FP_SMB == DIVST || !defined(STRIP)
 
 int fp_smb_divst(const fp_t a) {
@@ -197,10 +393,19 @@ int fp_smb_divst(const fp_t a) {
 #endif
 
 		k = 0;
-		fp_prime_back(_t, a);
-		dv_zero(g, RLC_FP_DIGS);
-		dv_copy(g, _t->dp, _t->used);
 		dv_copy(f, fp_prime_get(), RLC_FP_DIGS);
+#if FP_RDC == MONTY
+		/* Convert a from Montgomery form. */
+		dv_zero(t, 2 * RLC_FP_DIGS);
+		fp_copy(t, a);
+		fp_rdcn_low(g, t);
+#else
+		fp_copy(g, a);
+#endif
+		r = dv_cmp(g, f, RLC_FP_DIGS);
+		fp_subn_low(t, g, f);
+		fp_copy_sec(g, t, r != RLC_LT);
+
 		fs = gs = RLC_POS;
 
 		for (int i = 0; i < d; i++) {
@@ -240,15 +445,13 @@ int fp_smb_divst(const fp_t a) {
 		k = (2*k) % 4;
 		fp_zero(t);
 		t[0] = 1;
-		for (int j = 0; j < RLC_FP_DIGS; j++) {
-			f[j] ^= -fs;
-		}
-		fp_add1_low(f, f, fs);
-
-		r = RLC_SEL(r, 1 - k, dv_cmp_const(f, t, RLC_FP_DIGS) == RLC_EQ);
+		bn_negs_low(f, f, fs, RLC_FP_DIGS);
+		
+		r = RLC_SEL(r, 1 - k, dv_cmp_sec(f, t, RLC_FP_DIGS) == RLC_EQ);
 		bn_negs_low(t, t, 1, RLC_FP_DIGS);
-		r = RLC_SEL(r, 1 - k, dv_cmp_const(f, t, RLC_FP_DIGS) == RLC_EQ);
+		r = RLC_SEL(r, 1 - k, dv_cmp_sec(f, t, RLC_FP_DIGS) == RLC_EQ);
 		r = RLC_SEL(r, 1 - k, fp_is_zero(f));
+		r = RLC_SEL(r, 0, fp_is_zero(a));
 	} RLC_CATCH_ANY {
 		RLC_THROW(ERR_CAUGHT)
 	} RLC_FINALLY {
@@ -343,11 +546,11 @@ int fp_smb_jmpds(const fp_t a) {
 		j = (j + (j & 1)) % 4;
 
 		fp_zero(t0);
-		r = RLC_SEL(r, 1 - j, dv_cmp_const(f, t0, RLC_FP_DIGS) == RLC_EQ);
+		r = RLC_SEL(r, 1 - j, dv_cmp_sec(f, t0, RLC_FP_DIGS) == RLC_EQ);
 		t0[0] = 1;
-		r = RLC_SEL(r, 1 - j, dv_cmp_const(f, t0, RLC_FP_DIGS) == RLC_EQ);
+		r = RLC_SEL(r, 1 - j, dv_cmp_sec(f, t0, RLC_FP_DIGS) == RLC_EQ);
 		bn_negs_low(t0, t0, 1, RLC_FP_DIGS);
-		r = RLC_SEL(r, 1 - j, dv_cmp_const(f, t0, RLC_FP_DIGS) == RLC_EQ);
+		r = RLC_SEL(r, 1 - j, dv_cmp_sec(f, t0, RLC_FP_DIGS) == RLC_EQ);
 	}
 	RLC_CATCH_ANY {
 		RLC_THROW(ERR_CAUGHT);

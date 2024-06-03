@@ -40,6 +40,10 @@ void fp_copy(fp_t c, const fp_t a) {
 	dv_copy(c, a, RLC_FP_DIGS);
 }
 
+void fp_copy_sec(fp_t c, const fp_t a, dig_t bit) {
+	dv_copy_sec(c, a, RLC_FP_DIGS, bit);
+}
+
 void fp_zero(fp_t a) {
 	dv_zero(a, RLC_FP_DIGS);
 }
@@ -106,15 +110,11 @@ void fp_set_bit(fp_t a, uint_t bit, int value) {
 size_t fp_bits(const fp_t a) {
 	int i = RLC_FP_DIGS - 1;
 
-	while (i >= 0 && a[i] == 0) {
+	while (i > 0 && a[i] == 0) {
 		i--;
 	}
 
-	if (i > 0) {
-		return (i << RLC_DIG_LOG) + util_bits_dig(a[i]);
-	} else {
-		return util_bits_dig(a[0]);
-	}
+	return (i << RLC_DIG_LOG) + util_bits_dig(a[i]);
 }
 
 void fp_set_dig(fp_t c, dig_t a) {
@@ -122,7 +122,7 @@ void fp_set_dig(fp_t c, dig_t a) {
 }
 
 void fp_rand(fp_t a) {
-	int bits, digits;
+	uint_t bits, digits;
 
 	rand_bytes((uint8_t *)a, RLC_FP_DIGS * sizeof(dig_t));
 
@@ -161,6 +161,8 @@ void fp_print(const fp_t a) {
 		}
 #else
 		bn_read_raw(t, a, RLC_FP_DIGS);
+		fp_norm(t->dp, t->dp);
+		bn_trim(t);
 #endif
 
 		for (i = RLC_FP_DIGS - 1; i > 0; i--) {

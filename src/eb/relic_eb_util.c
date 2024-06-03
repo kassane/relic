@@ -78,7 +78,7 @@ void eb_rand(eb_t p) {
 	}
 }
 
-void eb_rhs(fb_t rhs, const eb_t p) {
+void eb_rhs(fb_t rhs, const fb_t x) {
 	fb_t t0, t1;
 
 	fb_null(t0);
@@ -89,9 +89,9 @@ void eb_rhs(fb_t rhs, const eb_t p) {
 		fb_new(t1);
 
 		/* t0 = x1^2. */
-		fb_sqr(t0, p->x);
+		fb_sqr(t0, x);
 		/* t1 = x1^3. */
-		fb_mul(t1, t0, p->x);
+		fb_mul(t1, t0, x);
 
 		/* t1 = x1^3 + a * x1^2 + b. */
 		switch (eb_curve_opt_a()) {
@@ -171,7 +171,7 @@ int eb_on_curve(const eb_t p) {
 		eb_norm(t, p);
 
 		fb_mul(lhs, t->x, t->y);
-		eb_rhs(t->x, t);
+		eb_rhs(t->x, t->x);
 		fb_sqr(t->y, t->y);
 		fb_add(lhs, lhs, t->y);
 		r = (fb_cmp(lhs, t->x) == RLC_EQ) || eb_is_infty(p);
@@ -204,7 +204,11 @@ void eb_tab(eb_t *t, const eb_t p, int w) {
 			eb_norm_sim(t + 1, (const eb_t *)t + 1, (1 << (w - 2)) - 1);
 #endif
 		}
+#if defined(EB_MIXED)
+		eb_norm(t[0], p);
+#else
 		eb_copy(t[0], p);
+#endif
 	}
 #endif /* EB_PLAIN */
 
@@ -485,8 +489,8 @@ void eb_print(const eb_t p) {
 	fb_print(p->z);
 }
 
-int eb_size_bin(const eb_t a, int pack) {
-	int size = 0;
+size_t eb_size_bin(const eb_t a, int pack) {
+	size_t size = 0;
 
 	if (eb_is_infty(a)) {
 		return 1;

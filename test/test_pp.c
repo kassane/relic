@@ -2004,15 +2004,15 @@ static int addition16(void) {
 			ep4_copy(s, r);
 			fp16_zero(e1);
 			fp16_zero(e2);
-#if EP_ADD == PROJC
 			/* Precompute. */
-			fp_neg(p->x, p->x);
-#else
+#if EP_ADD == BASIC
 			fp_neg(p->y, p->y);
+#else
+			fp_neg(p->x, p->x);
 #endif
 			pp_add_k16(e1, r, q, p);
 			pp_exp_k16(e1, e1);
-#if EP_ADD == PROJC
+#if EP_ADD != BASIC
 			/* Revert precompute. */
 			fp_neg(p->x, p->x);
 			fp_neg(p->y, p->y);
@@ -2032,11 +2032,10 @@ static int addition16(void) {
 			ep4_copy(s, r);
 			fp16_zero(e1);
 			fp16_zero(e2);
-#if EP_ADD == PROJC
-			/* Precompute. */
-			fp_neg(p->x, p->x);
-#else
+#if EP_ADD == BASIC
 			fp_neg(p->y, p->y);
+#else
+			fp_neg(p->x, p->x);
 #endif
 			pp_add_k16(e1, r, q, p);
 			pp_exp_k16(e1, e1);
@@ -3587,6 +3586,7 @@ static int doubling54(void) {
 
 		ep_curve_get_ord(n);
 
+#if EP_ADD == BASIC || !defined(STRIP)
 		TEST_CASE("miller doubling is correct") {
 			ep_rand(p);
 			fp9_copy(rx, qx);
@@ -3600,7 +3600,6 @@ static int doubling54(void) {
 			TEST_ASSERT(fp9_cmp(rx, qx) == RLC_EQ && fp9_cmp(ry, qy) == RLC_EQ, end);
 		} TEST_END;
 
-#if EP_ADD == BASIC || !defined(STRIP)
 		TEST_CASE("miller doubling in affine coordinates is correct") {
 			ep_rand(p);
 			fp9_copy(rx, qx);
@@ -3728,6 +3727,7 @@ static int addition54(void) {
 
 		ep_curve_get_ord(n);
 
+#if EP_ADD == BASIC || !defined(STRIP)
 		TEST_CASE("miller addition is correct") {
 			ep_rand(p);
 			fp9_copy(rx, qx);
@@ -3753,7 +3753,6 @@ static int addition54(void) {
 			TEST_ASSERT(fp9_cmp(rx, e1[0][0]) == RLC_EQ && fp9_cmp(ry, e1[0][1]) == RLC_EQ, end);
 		} TEST_END;
 
-#if EP_ADD == BASIC || !defined(STRIP)
 		TEST_CASE("miller addition in affine coordinates is correct") {
 			ep_rand(p);
 			fp9_copy(rx, qx);
@@ -3928,7 +3927,7 @@ int main(void) {
 
 	util_banner("Arithmetic", 1);
 
-	if (ep_param_embed() == 1) {
+	if (ep_curve_embed() == 1) {
 		if (doubling1() != RLC_OK) {
 			core_clean();
 			return 1;
@@ -3945,7 +3944,7 @@ int main(void) {
 		}
 	}
 
-	if (ep_param_embed() == 2) {
+	if (ep_curve_embed() == 2) {
 		if (doubling2() != RLC_OK) {
 			core_clean();
 			return 1;
@@ -3962,7 +3961,7 @@ int main(void) {
 		}
 	}
 
-	if (ep_param_embed() == 8) {
+	if (ep_curve_embed() == 8) {
 		if (doubling8() != RLC_OK) {
 			core_clean();
 			return 1;
@@ -3979,7 +3978,7 @@ int main(void) {
 		}
 	}
 
-	if (ep_param_embed() == 12) {
+	if (ep_curve_embed() == 12) {
 		if (doubling12() != RLC_OK) {
 			core_clean();
 			return 1;
@@ -3996,7 +3995,7 @@ int main(void) {
 		}
 	}
 
-	if (ep_param_embed() == 16) {
+	if (ep_curve_embed() == 16) {
 		if (doubling16() != RLC_OK) {
 			core_clean();
 			return 1;
@@ -4013,7 +4012,7 @@ int main(void) {
 		}
 	}
 
-	if (ep_param_embed() == 18) {
+	if (ep_curve_embed() == 18) {
 		if (doubling18() != RLC_OK) {
 			core_clean();
 			return 1;
@@ -4030,7 +4029,7 @@ int main(void) {
 		}
 	}
 
-	if (ep_param_embed() == 24) {
+	if (ep_curve_embed() == 24) {
 		if (doubling24() != RLC_OK) {
 			core_clean();
 			return 1;
@@ -4047,7 +4046,7 @@ int main(void) {
 		}
 	}
 
-	if (ep_param_embed() == 48) {
+	if (ep_curve_embed() == 48) {
 		if (doubling48() != RLC_OK) {
 			core_clean();
 			return 1;
@@ -4064,7 +4063,7 @@ int main(void) {
 		}
 	}
 
-	if (ep_param_embed() == 54) {
+	if (ep_curve_embed() == 54) {
 		if (doubling54() != RLC_OK) {
 			core_clean();
 			return 1;

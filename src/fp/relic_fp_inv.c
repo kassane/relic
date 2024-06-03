@@ -39,29 +39,15 @@
 
 #if FP_INV == JMPDS || !defined(STRIP)
 
-/**
- * Conditionally negate a digit vector using two's complement representation.
- *
- * @param[out] c 		- the result.
- * @param[in] a 		- the digit vector to conditionally negate.
- * @param[in] sa 		- the sign of the digit vector.
- * @param[in] n			- the number of digits to conditionally negate.
- */
-static void bn_negs_low(dig_t c[], const dig_t a[], dig_t sa, size_t n) {
-    dig_t carry = sa & 1;
+#ifdef RLC_FP_ROOM
 
-	sa = -sa;
-    for (int i = 0; i < n; i++) {
-        c[i] = (a[i] ^ sa) + carry;
-		carry = (c[i] < carry);
-    }
-}
-
-static void bn_mul2_low(dig_t *c, const dig_t *a, dis_t digit, int size) {
+static void bn_mul2_low(dig_t *c, const dig_t *a, dis_t digit, size_t size) {
 	int sd = digit >> (RLC_DIG - 1);
 	digit = (digit ^ sd) - sd;
 	c[size] = bn_mul1_low(c, a, digit, size);
 }
+
+#endif /* RLC_FP_ROOM */
 
 static dis_t jumpdivstep(dis_t m[4], dis_t delta, dig_t f, dig_t g, int s) {
 	dig_t u = 1, v = 0, q = 0, r = 1, c0, c1;
@@ -256,7 +242,7 @@ void fp_inv_monty(fp_t c, const fp_t a) {
 	bn_t _a, _p, u, v, x1, x2;
 	const dig_t *p = NULL;
 	dig_t carry;
-	int i, k, flag = 0;
+	int i, k;
 
 	bn_null(_a);
 	bn_null(_p);
@@ -340,18 +326,18 @@ void fp_inv_monty(fp_t c, const fp_t a) {
 			fp_subn_low(x1->dp, x1->dp, fp_prime_get());
 		}
 
-		dv_copy(x2->dp, fp_prime_get_conv(), RLC_FP_DIGS);
-
 		/* If k < Wt then x1 = x1 * R^2 * R^{-1} mod p. */
 		if (k <= RLC_FP_DIGS * RLC_DIG) {
-			flag = 1;
-			fp_mul(x1->dp, x1->dp, x2->dp);
 			k = k + RLC_FP_DIGS * RLC_DIG;
+#if FP_RDC == MONTY
+			fp_mul(x1->dp, x1->dp, fp_prime_get_conv());
+#endif
 		}
 
+#if FP_RDC == MONTY
 		/* x1 = x1 * R^2 * R^{-1} mod p. */
-		fp_mul(x1->dp, x1->dp, x2->dp);
-
+		fp_mul(x1->dp, x1->dp, fp_prime_get_conv());
+#endif
 		/* c = x1 * 2^(2Wt - k) * R^{-1} mod p. */
 		fp_copy(c, x1->dp);
 		dv_zero(x1->dp, RLC_FP_DIGS);
@@ -360,23 +346,14 @@ void fp_inv_monty(fp_t c, const fp_t a) {
 
 #if FP_RDC != MONTY
 		/*
-		 * If we do not use Montgomery reduction, the result of inversion is
-		 * a^{-1}R^3 mod p or a^{-1}R^4 mod p, depending on flag.
-		 * Hence we must reduce the result three or four times.
+		 * If we do not use Montgomery reduction, convert back.
 		 */
-		_a->used = RLC_FP_DIGS;
-		dv_copy(_a->dp, c, RLC_FP_DIGS);
-		bn_mod_monty_back(_a, _a, _p);
-		bn_mod_monty_back(_a, _a, _p);
+		bn_read_raw(_a, c, RLC_FP_DIGS);
 		bn_mod_monty_back(_a, _a, _p);
 
-		if (flag) {
-			bn_mod_monty_back(_a, _a, _p);
-		}
 		fp_zero(c);
 		dv_copy(c, _a->dp, _a->used);
 #endif
-		(void)flag;
 	}
 	RLC_CATCH_ANY {
 		RLC_THROW(ERR_CAUGHT);
@@ -476,12 +453,13 @@ void fp_inv_divst(fp_t c, const fp_t a) {
 	int g0, d0;
 	dig_t fs, gs, delta = 1;
 	bn_t _t;
-	fp_t f, g, t, u, v, r;
+	fp_t f, g, u, v, r;
+	dv_t t;
 
 	bn_null(_t);
+	dv_null(t);
 	fp_null(f);
 	fp_null(g);
-	fp_null(t);
 	fp_null(u);
 	fp_null(v);
 	fp_null(r);
@@ -493,19 +471,24 @@ void fp_inv_divst(fp_t c, const fp_t a) {
 
 	RLC_TRY {
 		bn_new(_t);
+		dv_new(t);
 		fp_new(f);
 		fp_new(g);
-		fp_new(t);
 		fp_new(u);
 		fp_new(v);
 		fp_new(r);
 
 		fp_zero(v);
 		fp_set_dig(r, 1);
-		fp_prime_back(_t, a);
-		dv_zero(g, RLC_FP_DIGS);
-		dv_copy(g, _t->dp, _t->used);
 		dv_copy(f, fp_prime_get(), RLC_FP_DIGS);
+#if FP_RDC == MONTY
+		/* Convert a from Montgomery form. */
+		dv_zero(t, 2 * RLC_FP_DIGS);
+		fp_copy(t, a);
+		fp_rdcn_low(g, t);
+#else
+		fp_copy(g, a);
+#endif
 		fs = gs = RLC_POS;
 
 		for (int i = 0; i < d; i++) {
@@ -515,10 +498,10 @@ void fp_inv_divst(fp_t c, const fp_t a) {
 			/* Conditionally negate delta if d0 is set. */
 			delta = (delta ^ -d0) + d0;
 			/* Conditionally swap based on d0. */
-			dv_swap_cond(r, v, RLC_FP_DIGS, d0);
+			dv_swap_sec(r, v, RLC_FP_DIGS, d0);
 			fp_negm_low(t, r);
-			dv_swap_cond(f, g, RLC_FP_DIGS, d0);
-			dv_copy_cond(r, t, RLC_FP_DIGS, d0);
+			dv_swap_sec(f, g, RLC_FP_DIGS, d0);
+			dv_copy_sec(r, t, RLC_FP_DIGS, d0);
 			for (int j = 0; j < RLC_FP_DIGS; j++) {
 				g[j] = RLC_SEL(g[j], ~g[j], d0);
 			}
@@ -544,7 +527,7 @@ void fp_inv_divst(fp_t c, const fp_t a) {
 			g[RLC_FP_DIGS - 1] |= (dig_t)gs << (RLC_DIG - 1);
 		}
 		fp_neg(t, v);
-		dv_copy_cond(v, t, RLC_FP_DIGS, fs);
+		fp_copy_sec(v, t, fs);
 
 		dv_copy(t, fp_prime_get(), RLC_FP_DIGS);
 		fp_add_dig(t, t, 1);
@@ -563,9 +546,9 @@ void fp_inv_divst(fp_t c, const fp_t a) {
 		RLC_THROW(ERR_CAUGHT)
 	} RLC_FINALLY {
 		bn_free(_t);
+		dv_free(t);
 		fp_free(f);
 		fp_free(g);
-		fp_free(t);
 		fp_free(u);
 		fp_free(v);
 		fp_free(r);
@@ -581,7 +564,7 @@ void fp_inv_jmpds(fp_t c, const fp_t a) {
 	/* Compute number of iterations based on modulus size. */
 	/* Iterations taken directly from https://github.com/sipa/safegcd-bounds */
 	const int iterations = (45907 * FP_PRIME + 26313) / 19929;
-	int loops, i, s = RLC_DIG - 2;
+	int loops, i, j = 0, s = RLC_DIG - 2;
 	dv_t f, g, t, p, t0, t1, u0, u1, v0, v1, p01, p11;
 	dig_t sf, sg;
 	fp_t pre;
@@ -620,31 +603,22 @@ void fp_inv_jmpds(fp_t c, const fp_t a) {
 		dv_new(p11);
 		fp_new(pre);
 
-#ifdef RLC_FP_ROOM
-		int j = 0;
 		fp_copy(pre, core_get()->inv.dp);
-#else
-		fp_copy(pre, core_get()->conv.dp);
-		fp_mul(pre, pre, core_get()->conv.dp);
-		fp_mul(pre, pre, core_get()->inv.dp);
-#endif
-		f[RLC_FP_DIGS] = g[RLC_FP_DIGS] = 0;
 		dv_zero(t, 2 * RLC_FP_DIGS);
 		dv_zero(p, 2 * RLC_FP_DIGS);
 		dv_zero(u0, 2 * RLC_FP_DIGS);
 		dv_zero(u1, 2 * RLC_FP_DIGS);
 		dv_zero(v0, 2 * RLC_FP_DIGS);
 		dv_zero(v1, 2 * RLC_FP_DIGS);
-
 		dv_copy(f, fp_prime_get(), RLC_FP_DIGS);
-		dv_copy(p + 1, fp_prime_get(), RLC_FP_DIGS);
 #if FP_RDC == MONTY
 		/* Convert a from Montgomery form. */
-		fp_copy(t, a);
-		fp_rdcn_low(g, t);
+		fp_copy(p, a);
+		fp_rdcn_low(g, p);
 #else
 		fp_copy(g, a);
 #endif
+		f[RLC_FP_DIGS] = g[RLC_FP_DIGS] = 0;
 		d = jumpdivstep(m, d, f[0] & RLC_MASK(s), g[0] & RLC_MASK(s), s);
 
 		t0[RLC_FP_DIGS] = bn_muls_low(t0, f, RLC_POS, m[0], RLC_FP_DIGS);
@@ -661,11 +635,11 @@ void fp_inv_jmpds(fp_t c, const fp_t a) {
 
 		/* Update column vector below. */
 		v1[0] = RLC_SEL(m[1], -m[1], RLC_SIGN(m[1]));
-		fp_negm_low(t, v1);
-		dv_copy_cond(v1, t, RLC_FP_DIGS, RLC_SIGN(m[1]));
+		fp_negm_low(t1, v1);
+		fp_copy_sec(v1, t1, RLC_SIGN(m[1]));
 		u1[0] = RLC_SEL(m[3], -m[3], RLC_SIGN(m[3]));
-		fp_negm_low(t, u1);
-		dv_copy_cond(u1, t, RLC_FP_DIGS, RLC_SIGN(m[3]));
+		fp_negm_low(t1, u1);
+		fp_copy_sec(u1, t1, RLC_SIGN(m[3]));
 
 		dv_copy(p01, v1, 2 * RLC_FP_DIGS);
 		dv_copy(p11, u1, 2 * RLC_FP_DIGS);
@@ -698,26 +672,26 @@ void fp_inv_jmpds(fp_t c, const fp_t a) {
 			/* Update column vector below. */
 			bn_mul2_low(v0, p01, m[0], RLC_FP_DIGS + j);
 			fp_subd_low(t, p, v0);
-			dv_copy_cond(v0, t, RLC_FP_DIGS + j + 1, RLC_SIGN(m[0]));
+			dv_copy_sec(v0, t, RLC_FP_DIGS + j + 1, RLC_SIGN(m[0]));
 
 			bn_mul2_low(v1, p11, m[1], RLC_FP_DIGS + j);
 			fp_subd_low(t, p, v1);
-			dv_copy_cond(v1, t, RLC_FP_DIGS + j + 1, RLC_SIGN(m[1]));
+			dv_copy_sec(v1, t, RLC_FP_DIGS + j + 1, RLC_SIGN(m[1]));
 
 			bn_mul2_low(u0, p01, m[2], RLC_FP_DIGS + j);
 			fp_subd_low(t, p, u0);
-			dv_copy_cond(u0, t, RLC_FP_DIGS + j + 1, RLC_SIGN(m[2]));
+			dv_copy_sec(u0, t, RLC_FP_DIGS + j + 1, RLC_SIGN(m[2]));
 
 			bn_mul2_low(u1, p11, m[3], RLC_FP_DIGS + j);
 			fp_subd_low(t, p, u1);
-			dv_copy_cond(u1, t, RLC_FP_DIGS + j + 1, RLC_SIGN(m[3]));
+			dv_copy_sec(u1, t, RLC_FP_DIGS + j + 1, RLC_SIGN(m[3]));
 
 			j = i % RLC_FP_DIGS;
 			if (j == 0) {
 				fp_addd_low(t, u0, u1);
-				fp_rdcn_low(p11, t);
+				fp_rdc(p11, t);
 				fp_addd_low(t, v0, v1);
-				fp_rdcn_low(p01, t);
+				fp_rdc(p01, t);
 				dv_zero(v0, 2 * RLC_FP_DIGS);
 				dv_zero(v1, 2 * RLC_FP_DIGS);
 			} else {
@@ -725,31 +699,29 @@ void fp_inv_jmpds(fp_t c, const fp_t a) {
 				fp_addd_low(p01, v0, v1);
 			}
 #else
-			fp_zero(p);
-			dv_copy(p + RLC_FP_DIGS, fp_prime_get(), RLC_FP_DIGS);
-
 			/* Update column vector below. */
-			bn_mul2_low(v0, p01, m[0], 2 * RLC_FP_DIGS);
-			fp_subd_low(t, p, v0);
-			dv_copy_cond(v0, t, 2 * RLC_FP_DIGS, RLC_SIGN(m[0]));
+			t[0] = RLC_SEL(m[0], -m[0], RLC_SIGN(m[0]));
+			fp_mul(v0, p01, t);
+			fp_neg(t0, v0);
+			fp_copy_sec(v0, t0, RLC_SIGN(m[0]));
 
-			bn_mul2_low(v1, p11, m[1], 2 * RLC_FP_DIGS);
-			fp_subd_low(t, p, v1);
-			dv_copy_cond(v1, t, 2 * RLC_FP_DIGS, RLC_SIGN(m[1]));
+			t[0] = RLC_SEL(m[1], -m[1], RLC_SIGN(m[1]));
+			fp_mul(v1, p11, t);
+			fp_neg(t1, v1);
+			fp_copy_sec(v1, t1, RLC_SIGN(m[1]));
 
-			bn_mul2_low(u0, p01, m[2], 2 * RLC_FP_DIGS);
-			fp_subd_low(t, p, u0);
-			dv_copy_cond(u0, t, 2 * RLC_FP_DIGS, RLC_SIGN(m[2]));
+			t[0] = RLC_SEL(m[2], -m[2], RLC_SIGN(m[2]));
+			fp_mul(u0, p01, t);
+			fp_neg(t0, u0);
+			fp_copy_sec(u0, t0, RLC_SIGN(m[2]));
 
-			bn_mul2_low(u1, p11, m[3], 2 * RLC_FP_DIGS);
-			fp_subd_low(t, p, u1);
-			dv_copy_cond(u1, t, 2 * RLC_FP_DIGS, RLC_SIGN(m[3]));
+			t[0] = RLC_SEL(m[3], -m[3], RLC_SIGN(m[3]));
+			fp_mul(u1, p11, t);
+			fp_neg(t1, u1);
+			fp_copy_sec(u1, t1, RLC_SIGN(m[3]));
 
-			fp_addc_low(t, u0, u1);
-			fp_rdcn_low(p11, t);
-			fp_addc_low(t, v0, v1);
-			fp_rdcn_low(p01, t);
-			fp_mulm_low(pre, pre, core_get()->conv.dp);
+			fp_add(p11, u0, u1);
+			fp_add(p01, v0, v1);
 #endif
 		}
 
@@ -778,34 +750,34 @@ void fp_inv_jmpds(fp_t c, const fp_t a) {
 		/* Update column vector below. */
 		bn_mul2_low(v0, p01, m[0], RLC_FP_DIGS + j);
 		fp_subd_low(t, p, v0);
-		dv_copy_cond(v0, t, RLC_FP_DIGS + j + 1, RLC_SIGN(m[0]));
+		dv_copy_sec(v0, t, RLC_FP_DIGS + j + 1, RLC_SIGN(m[0]));
 
 		bn_mul2_low(v1, p11, m[1], RLC_FP_DIGS + j);
 		fp_subd_low(t, p, v1);
-		dv_copy_cond(v1, t, RLC_FP_DIGS + j + 1, RLC_SIGN(m[1]));
+		dv_copy_sec(v1, t, RLC_FP_DIGS + j + 1, RLC_SIGN(m[1]));
 
 		fp_addd_low(t, v0, v1);
-		fp_rdcn_low(p01, t);
+		fp_rdc(p01, t);
 #else
-		fp_zero(p);
-		dv_copy(p + RLC_FP_DIGS, fp_prime_get(), RLC_FP_DIGS);
+		(void)j;
 
-		/* Update column vector below. */
-		bn_mul2_low(v0, p01, m[0], 2 * RLC_FP_DIGS);
-		fp_subd_low(t, p, v0);
-		dv_copy_cond(v0, t, 2 * RLC_FP_DIGS, RLC_SIGN(m[0]));
+		t[0] = RLC_SEL(m[0], -m[0], RLC_SIGN(m[0]));
+		fp_mul(v0, p01, t);
+		fp_neg(t0, v0);
+		fp_copy_sec(v0, t0, RLC_SIGN(m[0]));
 
-		bn_mul2_low(v1, p11, m[1], 2 * RLC_FP_DIGS);
-		fp_subd_low(t, p, v1);
-		dv_copy_cond(v1, t, 2 * RLC_FP_DIGS, RLC_SIGN(m[1]));
+		t[0] = RLC_SEL(m[1], -m[1], RLC_SIGN(m[1]));
+		fp_mul(v1, p11, t);
+		fp_neg(t1, v1);
+		fp_copy_sec(v1, t1, RLC_SIGN(m[1]));
 
-		fp_addc_low(t, v0, v1);
-		fp_rdcn_low(p01, t);
+		fp_add(p01, v0, v1);
 #endif
 
 		/* Negate based on sign of f at the end. */
 		fp_negm_low(t, p01);
-		dv_copy_cond(p01, t, RLC_FP_DIGS, f[RLC_FP_DIGS] >> (RLC_DIG - 1));
+		dv_copy_sec(p01, t, RLC_FP_DIGS, f[RLC_FP_DIGS] >> (RLC_DIG - 1));
+	
 		/* Multiply by (precomp * R^j) % p, one for each iteration of the loop,
 		 * one for the constant, one more to be removed by reduction. */
 		fp_mul(c, p01, pre);

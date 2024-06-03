@@ -56,8 +56,10 @@ void gt_rand(gt_t a) {
 	pp_exp_k24(a, a);
 #elif FP_PRIME == 330 || FP_PRIME == 765 || FP_PRIME == 766
 	pp_exp_k16(a, a);
-#elif FP_PRIME == 508 || FP_PRIME == 638 && !defined(FP_QNRES)
+#elif FP_PRIME == 508 || FP_PRIME == 768 || FP_PRIME == 638 && !defined(FP_QNRES)
 	pp_exp_k18(a, a);
+#elif FP_PRIME == 544
+	pp_exp_k8(a, a);
 #else
 	pp_exp_k12(a, a);
 #endif
@@ -102,8 +104,9 @@ int g1_is_valid(const g1_t a) {
 			/* If curve has prime order, simpler to check if point on curve. */
 			r = g1_on_curve(a);
 		} else {
+			fp_prime_get_par(n);
 			switch (ep_curve_is_pairf()) {
-#if defined(EP_ENDOM) && !defined(STRIP)
+#if defined(EP_ENDOM)
 				/* Formulas from "Co-factor clearing and subgroup membership
 				 * testing on pairing-friendly curves" by El Housni, Guillevic,
 				 * Piellard. https://eprint.iacr.org/2022/352.pdf */
@@ -111,7 +114,6 @@ int g1_is_valid(const g1_t a) {
 				case EP_B24:
 				case EP_B48:
 					/* Check [\psi(P) == [z^2 - 1]P. */
-					fp_prime_get_par(n);
 					bn_sqr(n, n);
 					if (ep_curve_is_pairf() == EP_B24) {
 						/* Check [\psi(P) == [z^4 - 1]P. */
@@ -130,7 +132,6 @@ int g1_is_valid(const g1_t a) {
 				/* if (u % 2) == 0, check (u**4)*\psi(P) == P
     		 	* else check (u**4-1)//2 * (\psi(P) - P) == P */
 				case EP_N16:
-					fp_prime_get_par(n);
 					bn_sqr(n, n);
 					bn_sqr(n, n);
 					ep_psi(u, a);
@@ -148,8 +149,7 @@ int g1_is_valid(const g1_t a) {
 				 * Zijian Zhou. https://eprint.iacr.org/2022/348.pdf */
 				case EP_K16:
 				    /* If u = 25 or 45 mod 70 then a1 = ((u//5)**4 + 5)//14
-					 * is an integer by definition.  */
-					fp_prime_get_par(n);
+					 * is an integer by definition. */
 					bn_div_dig(n, n, 5);
 					bn_sqr(n, n);
 					bn_sqr(n, n);
@@ -173,10 +173,18 @@ int g1_is_valid(const g1_t a) {
 					g1_neg(u, u);
 					r = g1_on_curve(a) && (g1_cmp(u, a) == RLC_EQ);
 					break;
+				case EP_FM16:
+					/* Check that P == (u**4)*\phi(P). */
+					g1_mul_any(u, a, n);
+					g1_mul_any(u, u, n);
+					g1_mul_any(u, u, n);
+					g1_mul_any(u, u, n);
+					ep_psi(u, u);
+					r = g1_on_curve(a) && (g1_cmp(u, a) == RLC_EQ);
+					break;
 				case EP_K18:
 					/* Check that [a_0]P + [a_1]\psi(P)) == O, for
 					 * a_0 = 19a_1 + 1, a_1 = (x/7)^3 */
-					fp_prime_get_par(n);
 					bn_div_dig(n, n, 7);
 					bn_sqr(t, n);
 					bn_mul(n, n, t);
@@ -209,9 +217,17 @@ int g1_is_valid(const g1_t a) {
 					}
 					r = g1_on_curve(a) && g1_is_infty(u);
 					break;
+				case EP_FM18:
+					/* Check that [u^3 - 1]P == \psi(P). */
+					ep_psi(u, a);
+					bn_sqr(t, n);
+					bn_mul(t, t, n);
+					bn_sub_dig(t, t, 1);
+					g1_mul_any(v, a, t);
+					r = g1_on_curve(a) && (g1_cmp(u, v) == RLC_EQ);
+					break;
 				case EP_SG18:
 					/* Check that [9u^3+2]\psi(P) == -P. */
-					fp_prime_get_par(n);
 					/* Apply \psi twice to get the other beta. */
 					ep_psi(u, a);
 					ep_psi(u, u);
@@ -250,14 +266,13 @@ int g1_is_valid(const g1_t a) {
 }
 
 int g2_is_valid(const g2_t a) {
+#if FP_PRIME >= 1536
+	return g1_is_valid(a);
+#else
 	g2_t s, t, u, v, w;
 	bn_t n;
 	dig_t rem;
 	int r = 0;
-
-#if FP_PRIME >= 1536
-	return g1_is_valid(a);
-#else
 
 	if (g2_is_infty(a)) {
 		return 0;
@@ -278,8 +293,9 @@ int g2_is_valid(const g2_t a) {
 		g2_new(v);
 		g2_new(w);
 
+		fp_prime_get_par(n);
 		switch (ep_curve_is_pairf()) {
-#if defined(EP_ENDOM) && !defined(STRIP)
+#if defined(EP_ENDOM)
 			/* Formulas from "Co-factor clearing and subgroup membership
 			* testing on pairing-friendly curves" by El Housni, Guillevic,
 			* Piellard. https://eprint.iacr.org/2022/352.pdf */
@@ -305,7 +321,6 @@ int g2_is_valid(const g2_t a) {
 			 * https://eprint.iacr.org/2022/348.pdf */
 			case EP_BN:
 				/*Check that [z+1]P+[z]\psi(P)+[z]\psi^2(P)=[2z]\psi^3(P)*/
-				fp_prime_get_par(n);
 				g2_mul_any(u, a, n);
 				g2_frb(v, u, 1);
 				g2_add(u, u, a);
@@ -319,7 +334,6 @@ int g2_is_valid(const g2_t a) {
 			/* If u is even, check that [u*p^3]P = P
 			 * else check [p^5]P = [u]P. */
 			case EP_N16:
-				fp_prime_get_par(n);
 				g2_mul_any(u, a, n);
 				if (bn_is_even(n)) {
 					g2_frb(v, u, 3);
@@ -334,7 +348,6 @@ int g2_is_valid(const g2_t a) {
 			 * https://eprint.iacr.org/2022/348.pdf
 			 * Paper has u = 45 mod 70, we ran their code for u = 25 mod 70. */
 			case EP_K16:
-				fp_prime_get_par(n);
 				bn_mod_dig(&rem, n, 70);
 				if (rem == 45) {
 					bn_neg(n, n);
@@ -384,9 +397,14 @@ int g2_is_valid(const g2_t a) {
 				g2_frb(t, t, 4);
 				r = g2_on_curve(a) && (g2_cmp(w, t) == RLC_EQ);
 				break;
+			case EP_FM16:
+				/* Check that u*Q == psi(Q). */
+				g2_mul_any(u, a, n);
+				g2_frb(v, a, 1);
+				r = g2_on_curve(a) && (g2_cmp(u, v) == RLC_EQ);
+				break;
 			case EP_K18:
 				/* Check that P + u*psi2P + 2*psi3P == \mathcal{O}. */
-				fp_prime_get_par(n);
 				g2_frb(u, a, 2);
 				g2_frb(v, u, 1);
 				g2_dbl(v, v);
@@ -395,9 +413,15 @@ int g2_is_valid(const g2_t a) {
 				g2_neg(u, v);
 				r = g2_on_curve(a) && (g2_cmp(u, a) == RLC_EQ);
 				break;
+			case EP_FM18:
+				/* Check that Q == -u*\psi^2(Q). */
+				bn_neg(n, n);
+				g2_mul_any(u, a, n);
+				g2_frb(u, u, 2);
+				r = g2_on_curve(a) && (g2_cmp(u, a) == RLC_EQ);
+				break;
 			case EP_SG18:
 				/* Check that 3u*P + 2\psi^2(P) == \psi^5P] and [3]P \eq O. */
-				fp_prime_get_par(n);
 				bn_mul_dig(n, n, 3);
 				g2_mul_any(u, a, n);
 				r = g2_is_infty(a) == 0;
@@ -571,6 +595,14 @@ int gt_is_valid(const gt_t a) {
 				r = (gt_cmp(w, t) == RLC_EQ);
 				r &= fp16_test_cyc((void *)a);
 				break;
+			case EP_FM16:
+				/* Check that u*Q == psi(Q). */
+				fp_prime_get_par(n);
+				gt_exp(u, a, n);
+				gt_frb(v, a, 1);
+				r = (gt_cmp(u, v) == RLC_EQ);
+				r &= fp16_test_cyc((void *)a);
+				break;
 			case EP_K18:
 				/* Check that P + u*psi2P + 2*psi3P == \mathcal{O}. */
 				gt_frb(u, a, 2);
@@ -579,6 +611,14 @@ int gt_is_valid(const gt_t a) {
 				fp18_exp_cyc_sps((void *)u, (void *)u, b, l, bn_sign(n));
 				gt_mul(v, v, u);
 				gt_inv(u, v);
+				r = (gt_cmp(u, a) == RLC_EQ);
+				r &= fp18_test_cyc((void *)a);
+				break;
+			case EP_FM18:
+				/* Check that Q == -u*\psi^2(Q). */
+				bn_neg(n, n);
+				gt_exp(u, a, n);
+				gt_frb(u, u, 2);
 				r = (gt_cmp(u, a) == RLC_EQ);
 				r &= fp18_test_cyc((void *)a);
 				break;

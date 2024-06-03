@@ -41,18 +41,31 @@
 /* Public definitions                                                         */
 /*============================================================================*/
 
-dig_t bn_lsh1_low(dig_t *c, const dig_t *a, int size) {
+dig_t bn_lsh1_low(dig_t *c, const dig_t *a, size_t size) {
 	return mpn_lshift(c, a, size, 1);
 }
 
-dig_t bn_lshb_low(dig_t *c, const dig_t *a, int size, int bits) {
+dig_t bn_lshb_low(dig_t *c, const dig_t *a, size_t size, uint_t bits) {
 	return mpn_lshift(c, a, size, bits);
 }
 
-dig_t bn_rsh1_low(dig_t *c, const dig_t *a, int size) {
+dig_t bn_rsh1_low(dig_t *c, const dig_t *a, size_t size) {
 	return mpn_rshift(c, a, size, 1);
 }
 
-dig_t bn_rshb_low(dig_t *c, const dig_t *a, int size, int bits) {
+dig_t bn_rshb_low(dig_t *c, const dig_t *a, size_t size, uint_t bits) {
 	return mpn_rshift(c, a, size, bits);
+}
+
+dig_t bn_rshs_low(dig_t *c, const dig_t *a, size_t size, uint_t bits) {
+	dig_t r, carry, shift, mask;
+
+	/* Prepare the bit mask. */
+	shift = (RLC_DIG - bits) % RLC_DIG;
+	mask = RLC_MASK(bits);
+	r = a[size - 1] & mask;
+	c[size - 1] = (dis_t)a[size - 1] >> bits;
+	carry = mpn_rshift(c, a, size - 1, bits);
+	c[size - 2] |= (r << shift);
+	return carry;
 }

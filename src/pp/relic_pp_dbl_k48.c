@@ -78,7 +78,7 @@ void pp_dbl_k48_basic(fp48_t l, ep8_t r, const ep8_t q, const ep_t p) {
 
 #endif
 
-#if EP_ADD == PROJC || !defined(STRIP)
+#if EP_ADD == PROJC || EP_ADD == JACOB || !defined(STRIP)
 
 void pp_dbl_k48_projc(fp48_t l, ep8_t r, const ep8_t q, const ep_t p) {
 	fp8_t t0, t1, t2, t3, t4, t5, t6;
@@ -109,8 +109,7 @@ void pp_dbl_k48_projc(fp48_t l, ep8_t r, const ep8_t q, const ep_t p) {
 		/* D = 3bC, general b. */
 		fp8_dbl(t3, t2);
 		fp8_add(t3, t3, t2);
-		ep8_curve_get_b(t4);
-		fp8_mul(t3, t3, t4);
+		fp8_mul(t3, t3, ep8_curve_get_b());
 
 		/* E = (x1 + y1)^2 - A - B. */
 		fp8_add(t4, q->x, q->y);

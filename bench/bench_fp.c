@@ -69,6 +69,18 @@ static void util(void) {
 	}
 	BENCH_END;
 
+	BENCH_RUN("fp_copy_sec (0)") {
+		fp_rand(a);
+		BENCH_ADD(fp_copy_sec(b, a, 0));
+	}
+	BENCH_END;
+
+	BENCH_RUN("fp_copy_sec (1)") {
+		fp_rand(a);
+		BENCH_ADD(fp_copy_sec(b, a, 1));
+	}
+	BENCH_END;
+
 	BENCH_RUN("fp_zero") {
 		fp_rand(a);
 		BENCH_ADD(fp_zero(a));
@@ -567,6 +579,15 @@ static void arith(void) {
 		fp_rand(a);
 		fp_sqr(a, a);
 		BENCH_ADD(fp_smb_basic(a));
+	}
+	BENCH_END;
+#endif
+
+#if FP_SMB == BINAR || !defined(STRIP)
+	BENCH_RUN("fp_smb_binar") {
+		fp_rand(a);
+		fp_sqr(a, a);
+		BENCH_ADD(fp_smb_binar(a));
 	}
 	BENCH_END;
 #endif

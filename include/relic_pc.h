@@ -62,7 +62,7 @@
 #elif FP_PRIME == 315 || FP_PRIME == 317 || FP_PRIME == 330 || FP_PRIME == 509 || FP_PRIME == 765 || FP_PRIME == 766
 #define RLC_G2_LOWER			ep4_
 #define RLC_G2_BASEF(A)			A[0][0]
-#elif FP_PRIME == 508 || FP_PRIME == 638 && !defined(FP_QNRES)
+#elif FP_PRIME == 508 || FP_PRIME == 768 || FP_PRIME == 638 && !defined(FP_QNRES)
 #define RLC_G2_LOWER			ep3_
 #define RLC_G2_BASEF(A)			A[0]
 #else
@@ -78,18 +78,21 @@
 #elif FP_PRIME == 315 || FP_PRIME == 317 || FP_PRIME == 509
 #define RLC_GT_LOWER			fp24_
 #define RLC_GT_EMBED      		24
-#elif FP_PRIME == 508 || FP_PRIME == 638 && !defined(FP_QNRES)
+#elif FP_PRIME == 508 || FP_PRIME == 768 || FP_PRIME == 638 && !defined(FP_QNRES)
 #define RLC_GT_LOWER			fp18_
 #define RLC_GT_EMBED      		18
 #elif FP_PRIME == 330 || FP_PRIME == 765 || FP_PRIME == 766
 #define RLC_GT_LOWER			fp16_
 #define RLC_GT_EMBED      		16
+#elif FP_PRIME == 544
+#define RLC_GT_LOWER			fp8_
+#define RLC_GT_EMBED      		8
 #else
 #define RLC_GT_LOWER			fp12_
 #define RLC_GT_EMBED      		12
 #endif
 
-#else
+#else /* FP_PRIME >= 1536*/
 #define RLC_G1_LOWER			ep_
 #define RLC_G1_UPPER			EP
 #define RLC_G2_LOWER			ep_
@@ -405,6 +408,15 @@ typedef RLC_CAT(RLC_GT_LOWER, t) gt_t;
  * @param[in] A				- the element to copy.
  */
 #define gt_copy(C, A)		RLC_CAT(RLC_GT_LOWER, copy)(C, A)
+
+/**
+ * Conditionally copies the second argument to the first argument.
+ *
+ * @param[out] C			- the result.
+ * @param[in] A				- the element to copy.
+ * @param[in] B				- the condition bit to evaluate.
+ */
+#define gt_copy_sec(C, A, B)	RLC_CAT(RLC_GT_LOWER, copy_sec)(C, A, B)
 
 /**
  * Compares two elements from G_1.
@@ -729,7 +741,16 @@ typedef RLC_CAT(RLC_GT_LOWER, t) gt_t;
  * @param[in] P					- the element to multiply.
  * @param[in] K					- the secret scalar.
  */
-#define g1_mul_key(R, P, K)		RLC_CAT(RLC_G1_LOWER, mul_lwreg)(R, P, K)
+#define g1_mul_sec(R, P, K)		RLC_CAT(RLC_G1_LOWER, mul_lwreg)(R, P, K)
+
+/**
+ * Multiplies an element from G_2 by a secret scalar. Computes R = [k]P.
+ *
+ * @param[out] R				- the result.
+ * @param[in] P					- the element to multiply.
+ * @param[in] K					- the secret scalar.
+ */
+#define g2_mul_sec(R, P, K)		RLC_CAT(RLC_G2_LOWER, mul_lwreg)(R, P, K)
 
 /**
  * Multiplies an element from a larger group containing G_1 by a scalar.
@@ -910,7 +931,7 @@ typedef RLC_CAT(RLC_GT_LOWER, t) gt_t;
 #if FP_PRIME <= 1536
 #define gt_frb(C, A, I)		RLC_CAT(RLC_GT_LOWER, frb)(C, A, I)
 #else
-#define gt_frb(C, A, I)		(A)
+#define gt_frb(C, A, I)		RLC_CAT(RLC_GT_LOWER, copy)(C, A)
 #endif
 
 /**
@@ -1031,6 +1052,15 @@ void g2_mul_gen(g2_t r, const bn_t k);
 void gt_exp(gt_t c, const gt_t a, const bn_t b);
 
 /**
+ * Exponentiates an element from G_T by a secret integer. Computes c = a^b.
+ *
+ * @param[out] c			- the result.
+ * @param[in] a				- the element to exponentiate.
+ * @param[in] b				- the integer exponent.
+ */
+void gt_exp_sec(gt_t c, const gt_t a, const bn_t b);
+
+/**
  * Exponentiates an element from G_T by a small integer. Computes c = a^b.
  *
  * @param[out] c			- the result.
@@ -1040,7 +1070,7 @@ void gt_exp(gt_t c, const gt_t a, const bn_t b);
 void gt_exp_dig(gt_t c, const gt_t a, const dig_t b);
 
 /**
- * Exponentiates two element from G_T by integers simultaneously. Computes
+ * Exponentiates two elements from G_T by integers simultaneously. Computes
  * e = a^b * c^d.
  *
  * @param[out] e			- the result.
